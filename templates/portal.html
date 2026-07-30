@@ -1,0 +1,1350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Aspidus B2B Client Portal</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        :root {
+            --p-bg: #f4f6f9;
+            --p-panel: #ffffff;
+            --p-card: #ffffff;
+            --p-text: #101828;
+            --p-muted: #667085;
+            --p-border: #e7eaef;
+            --p-border-strong: #d5dae1;
+            --p-hover: #f2f5f9;
+            --p-accent: #2563eb;
+            --p-accent-hover: #1d4ed8;
+            --p-accent-soft: #eef4ff;
+            --p-success: #059669;
+            --p-danger: #dc2626;
+            --p-warning: #d97706;
+        }
+        html { font-size: 15px; }
+        body {
+            background-color: var(--p-bg);
+            font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+            color: var(--p-text);
+            -webkit-font-smoothing: antialiased;
+            letter-spacing: -0.006em;
+        }
+        .panel { background: var(--p-panel); border: 1px solid var(--p-border); border-radius: 12px; box-shadow: 0 1px 2px rgba(16,24,40,0.04), 0 1px 3px rgba(16,24,40,0.06); }
+        .card { background: var(--p-card); border: 1px solid var(--p-border); border-radius: 14px; }
+        .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 9px 15px; border-radius: 10px; font-weight: 600; font-size: 0.9rem; transition: all 0.15s ease; border: 1px solid transparent; cursor: pointer; }
+        .btn-primary { background: var(--p-accent); color: #fff; }
+        .btn-primary:hover { background: var(--p-accent-hover); }
+        .btn-ghost { background: var(--p-panel); color: var(--p-text); border-color: var(--p-border-strong); }
+        .btn-ghost:hover { background: var(--p-hover); }
+        .btn-danger { background: #fef2f2; color: var(--p-danger); border-color: #fecaca; }
+        .btn-danger:hover { background: #fee2e2; }
+        .input { width: 100%; box-sizing: border-box; padding: 10px 13px; background: var(--p-panel); border: 1px solid var(--p-border-strong); border-radius: 8px; color: var(--p-text); font-size: 0.9rem; line-height: 1.4; min-height: 40px; transition: box-shadow 0.15s ease, border-color 0.15s ease; }
+        .input:focus { outline: none; border-color: var(--p-accent); box-shadow: 0 0 0 3px rgba(37,99,235,0.18); }
+        textarea.input { min-height: 80px; resize: vertical; font-family: inherit; }
+        select.input { padding-right: 34px; appearance: none; background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="%2364748b"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>'); background-repeat: no-repeat; background-position: right 10px center; background-size: 16px; }
+        .label { display: block; font-size: 0.72rem; font-weight: 600; color: var(--p-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; line-height: 1.3; max-width: 100%; overflow-wrap: break-word; }
+        /* Kada je grupa polja (label + input + helper), obezbedi minimalan
+           vertikalni razmak da helper text ne dotiče sledeći input. */
+        .card > div > .label + .input,
+        .card > div > .label + input,
+        .card > div > .label + select,
+        .card > div > .label + textarea { margin-bottom: 0; }
+        .card > div > .input + .field-help,
+        .card > div > input + .field-help,
+        .card > div > select + .field-help,
+        .card > div > textarea + .field-help { margin-top: 6px; }
+        .badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; border-radius: 999px; font-size: 0.72rem; font-weight: 600; letter-spacing: 0.01em; border: 1px solid transparent; }
+        .badge-warning { background: #fef3c7; color: #92400e; border-color: #fde68a; }
+        .badge-success { background: #d1fae5; color: #065f46; border-color: #a7f3d0; }
+        .badge-info { background: #dbeafe; color: #1e40af; border-color: #bfdbfe; }
+        .badge-danger { background: #fee2e2; color: #991b1b; border-color: #fecaca; }
+        .badge-muted { background: #f1f5f9; color: #475569; border-color: #e2e8f0; }
+        .tab-btn { padding: 12px 16px; font-weight: 500; font-size: 0.88rem; color: var(--p-muted); border-radius: 10px; transition: all 0.15s ease; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; position: relative; min-height: 44px; }
+        @media (max-width: 640px) {
+            .tab-btn { padding: 12px 14px; font-size: 0.85rem; flex: 1 1 auto; justify-content: center; }
+            .tab-btn svg { display: none; }  /* uštedi mesto na uskim ekranima */
+            .btn, button.btn-primary { min-height: 44px; }
+            .input, input, select, textarea { font-size: 16px; }  /* sprečava iOS zoom */
+        }
+        .tab-btn:hover { background: var(--p-hover); color: var(--p-text); }
+        .tab-btn.active { background: var(--p-accent-soft); color: var(--p-accent); font-weight: 600; }
+        .tab-btn .count { background: var(--p-accent); color: #fff; padding: 1px 7px; border-radius: 999px; font-size: 0.68rem; font-weight: 700; min-width: 18px; text-align: center; }
+        .tab-btn.active .count { background: var(--p-accent); }
+        .tab-btn:not(.active) .count { background: #ef4444; }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        .label.required::after { content: ' *'; color: #ef4444; font-weight: 700; }
+        .field-help { font-size: 0.68rem; color: #94a3b8; margin-top: 2px; line-height: 1.3; }
+        .stat-card { padding: 20px; border-radius: 14px; background: var(--p-panel); border: 1px solid var(--p-border); box-shadow: 0 1px 2px rgba(16,24,40,0.04); transition: box-shadow 0.15s ease; }
+        .stat-card:hover { box-shadow: 0 4px 12px rgba(16,24,40,0.06); }
+        .stat-label { font-size: 0.72rem; font-weight: 600; color: var(--p-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+        .stat-value { font-size: 1.75rem; font-weight: 700; color: var(--p-text); margin-top: 6px; letter-spacing: -0.02em; }
+        .row-hover:hover { background: var(--p-hover); }
+        .icon-btn { width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; border-radius: 8px; color: var(--p-muted); transition: all 0.15s ease; cursor: pointer; }
+        .icon-btn:hover { background: var(--p-hover); color: var(--p-text); }
+        .notif-panel { position: absolute; top: 100%; right: 0; margin-top: 8px; width: 360px; max-width: 90vw; background: var(--p-panel); border: 1px solid var(--p-border); border-radius: 12px; box-shadow: 0 10px 30px rgba(16,24,40,0.12); z-index: 200; max-height: 480px; display: flex; flex-direction: column; }
+        .notif-item { padding: 12px 16px; border-bottom: 1px solid var(--p-border); transition: background 0.15s ease; cursor: pointer; }
+        .notif-item:last-child { border-bottom: none; }
+        .notif-item:hover { background: var(--p-hover); }
+        .notif-item.unread { background: var(--p-accent-soft); }
+        .notif-item.unread:hover { background: #e0ebff; }
+        .timeline-stage { flex: 1; position: relative; text-align: center; }
+        .timeline-stage .dot { width: 22px; height: 22px; border-radius: 50%; background: var(--p-border-strong); margin: 0 auto 6px; border: 3px solid var(--p-panel); position: relative; z-index: 1; transition: all 0.2s ease; }
+        .timeline-stage.active .dot { background: var(--p-accent); box-shadow: 0 0 0 4px var(--p-accent-soft); }
+
+        /* ==========================================================
+           PREMIUM MODE — luksuzniji tretman za VIP klijente.
+           Aktivira se dodavanjem klase 'premium-mode' na <body> iz
+           portal/api.js kada backend vrati partner.isPremium=true.
+           ========================================================== */
+        body.premium-mode {
+            background:
+              radial-gradient(circle at top left, rgba(184,137,46,0.06) 0%, transparent 45%),
+              radial-gradient(circle at bottom right, rgba(184,137,46,0.05) 0%, transparent 55%),
+              linear-gradient(180deg, #fbfaf7 0%, #f5f0e6 100%);
+        }
+        body.premium-mode .panel {
+            border-color: #e8dcc4;
+            box-shadow: 0 4px 24px rgba(184,137,46,0.10), 0 1px 3px rgba(90,60,10,0.04);
+            background: linear-gradient(180deg, #ffffff 0%, #fefdf9 100%);
+        }
+        body.premium-mode .btn.btn-primary {
+            background: linear-gradient(135deg, #d4a94c 0%, #b8892e 100%);
+            color: #ffffff;
+            border: none;
+            box-shadow: 0 3px 10px rgba(184,137,46,0.30);
+        }
+        body.premium-mode .btn.btn-primary:hover {
+            background: linear-gradient(135deg, #b8892e 0%, #96701d 100%);
+        }
+        body.premium-mode .badge-success {
+            background: linear-gradient(135deg,#e8b34a,#b8892e);
+            color: #3d2f00;
+        }
+        body.premium-mode .tab-btn.active {
+            background: linear-gradient(135deg, #fdf6e3 0%, #f5e8c8 100%);
+            color: #6b4c0f;
+            border-bottom: 2px solid #b8892e;
+            font-weight: 700;
+        }
+        body.premium-mode nav#portal-nav {
+            background: linear-gradient(90deg, #ffffff 0%, #fbfaf7 100%);
+            border-bottom: 1px solid #e8dcc4;
+        }
+        body.premium-mode h1, body.premium-mode h2, body.premium-mode h3 {
+            letter-spacing: -0.015em;
+        }
+        body.premium-mode .stat-card {
+            background: linear-gradient(135deg, #ffffff 0%, #fdfaf3 100%);
+            border-color: #e8dcc4;
+        }
+        body.premium-mode .stat-card .value {
+            background: linear-gradient(135deg, #b8892e 0%, #6b4c0f 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            font-weight: 800;
+        }
+        .timeline-stage.done .dot { background: var(--p-success); }
+        .timeline-stage.done .dot::after { content: '\2713'; color: #fff; font-size: 12px; font-weight: bold; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); }
+        .timeline-stage .lbl { font-size: 10px; font-weight: 600; color: var(--p-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+        .timeline-stage.active .lbl, .timeline-stage.done .lbl { color: var(--p-text); }
+        .timeline-bar { position: absolute; top: 10px; left: 50%; right: -50%; height: 3px; background: var(--p-border); z-index: 0; }
+        .timeline-stage.done .timeline-bar { background: var(--p-success); }
+        .timeline-stage:last-child .timeline-bar { display: none; }
+        .search-input { width: 100%; padding: 8px 12px 8px 34px; background: var(--p-panel); border: 1px solid var(--p-border-strong); border-radius: 8px; font-size: 0.85rem; color: var(--p-text); }
+        .search-input:focus { outline: none; border-color: var(--p-accent); box-shadow: 0 0 0 3px rgba(37,99,235,0.15); }
+        .search-wrap { position: relative; }
+        .search-wrap svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); width: 16px; height: 16px; color: var(--p-muted); pointer-events: none; }
+        .chip { display: inline-flex; align-items: center; padding: 4px 10px; border-radius: 999px; font-size: 0.72rem; font-weight: 600; background: var(--p-hover); color: var(--p-muted); cursor: pointer; border: 1px solid var(--p-border); }
+        .chip.active { background: var(--p-accent); color: #fff; border-color: var(--p-accent); }
+        .chip:hover:not(.active) { background: var(--p-border); }
+        .toast { position: fixed; top: 20px; right: 20px; background: var(--p-panel); border: 1px solid var(--p-border); border-radius: 10px; padding: 12px 18px; box-shadow: 0 10px 25px rgba(16,24,40,0.1); z-index: 300; font-size: 0.9rem; max-width: 380px; }
+        .toast.toast-success { border-left: 4px solid var(--p-success); }
+        .toast.toast-error { border-left: 4px solid var(--p-danger); }
+        .toast.toast-info { border-left: 4px solid var(--p-accent); }
+        .hidden { display: none !important; }
+        .fade-in { animation: fadeIn 0.25s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+    </style>
+</head>
+<body class="pb-16">
+
+    <!-- LOADING STATE -->
+    <div class="text-center py-24" id="loading-state">
+        <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 mx-auto"></div>
+        <p class="mt-4 text-slate-500 text-xs font-semibold uppercase tracking-widest" id="lbl-loading">Loading Secure Portal…</p>
+    </div>
+
+    <!-- OTP SCREEN -->
+    <div id="otp-screen" class="max-w-md mx-auto mt-20 px-4 hidden fade-in">
+        <div class="panel p-8 rounded-2xl">
+            <div class="text-center mb-6">
+                <div class="w-14 h-14 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center mx-auto mb-4">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" class="w-6 h-6"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                </div>
+                <h2 class="text-xl font-bold text-slate-900" id="lbl-otp-title">Secure Portal Access</h2>
+                <p class="text-sm text-slate-500 mt-2" id="lbl-otp-desc">A one-time code has been sent to your email.</p>
+            </div>
+            <div class="space-y-4">
+                <p id="otp-status-msg" class="text-xs font-medium text-center text-blue-700 bg-blue-50 py-3 rounded-lg border border-blue-100 hidden"></p>
+                <div id="otp-input-area" class="hidden space-y-4 pt-4 border-t border-slate-100">
+                    <div>
+                        <label class="label" id="lbl-enter-code">Enter 6-digit Code</label>
+                        <!-- 6-pojedinačnih polja sa auto-focus + paste podržkom -->
+                        <div id="otp-code-boxes" class="flex justify-between gap-2" role="group" aria-label="One-time code">
+                            <input class="otp-code-box w-11 h-14 text-center text-2xl font-bold font-mono border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none" maxlength="1" inputmode="numeric" autocomplete="one-time-code" data-idx="0">
+                            <input class="otp-code-box w-11 h-14 text-center text-2xl font-bold font-mono border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none" maxlength="1" inputmode="numeric" data-idx="1">
+                            <input class="otp-code-box w-11 h-14 text-center text-2xl font-bold font-mono border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none" maxlength="1" inputmode="numeric" data-idx="2">
+                            <input class="otp-code-box w-11 h-14 text-center text-2xl font-bold font-mono border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none" maxlength="1" inputmode="numeric" data-idx="3">
+                            <input class="otp-code-box w-11 h-14 text-center text-2xl font-bold font-mono border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none" maxlength="1" inputmode="numeric" data-idx="4">
+                            <input class="otp-code-box w-11 h-14 text-center text-2xl font-bold font-mono border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none" maxlength="1" inputmode="numeric" data-idx="5">
+                        </div>
+                        <input type="hidden" id="otp-code">
+                        <p class="text-[11px] text-slate-500 mt-2">Paste the whole code — boxes fill automatically.</p>
+                    </div>
+                    <button id="btn-verify-otp" class="btn btn-primary w-full py-3" onclick="verifyOTP()">Verify &amp; Login</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- PORTAL CONTENT -->
+    <div id="portal-content" class="hidden max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
+
+        <!-- HEADER -->
+        <header class="panel px-6 py-4 mb-6 flex flex-col md:flex-row justify-between items-center gap-4 relative">
+            <div class="flex items-center gap-4">
+                <img id="comp-logo" src="" alt="" class="h-10 hidden">
+                <div>
+                    <h1 class="text-lg font-bold text-slate-900 tracking-tight" id="comp-name">Aspidus</h1>
+                    <p class="text-[10px] font-semibold text-blue-600 uppercase tracking-widest" id="lbl-b2b">B2B Client Portal</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-4">
+                <!-- NOTIFICATIONS BELL -->
+                <button id="btn-notifications" type="button" class="icon-btn relative" onclick="toggleNotificationsPanel()" title="Notifications">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+                    <span id="notif-count" class="absolute -top-1 -right-1 bg-red-500 text-white text-[9px] font-bold rounded-full min-w-[16px] h-[16px] px-1 flex items-center justify-center hidden">0</span>
+                </button>
+                <div class="text-right hidden md:block">
+                    <p class="text-[10px] text-slate-400 font-semibold uppercase tracking-wider" id="lbl-welcome">Welcome</p>
+                    <p class="text-sm font-semibold text-slate-800" id="partner-name">—</p>
+                </div>
+                <button id="portal-refresh-btn" class="btn bg-white border border-slate-200 text-slate-700 hover:bg-slate-50" title="Refresh" aria-label="Refresh data" onclick="refreshPortal()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4" id="portal-refresh-icon"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                    <span class="hidden sm:inline text-xs font-semibold ml-1" id="lbl-refresh">Refresh</span>
+                </button>
+                <button class="btn btn-danger" onclick="portalLogout()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5M21 12H9"/></svg>
+                    <span id="lbl-logout">Logout</span>
+                </button>
+            </div>
+            <!-- NOTIFICATIONS PANEL (hidden by default, toggled from bell) -->
+            <div id="notif-panel" class="notif-panel hidden">
+                <div class="flex items-center justify-between px-4 py-3 border-b border-slate-100">
+                    <h4 class="text-sm font-semibold text-slate-900">Notifications</h4>
+                    <button type="button" class="text-xs text-blue-600 hover:underline font-medium" onclick="markAllNotificationsRead()">Mark all read</button>
+                </div>
+                <div id="notif-body" class="overflow-y-auto custom-scrollbar flex-1"></div>
+            </div>
+        </header>
+
+        <!-- UPDATE REQUEST BANNER -->
+        <div id="update-request-banner" class="hidden panel border-l-4 border-red-500 px-6 py-4 mb-6" style="border-left-color: var(--p-danger); border-radius: 12px;">
+            <h3 class="text-red-700 font-semibold text-sm flex items-center gap-2">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m0 3.75h.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z"/></svg>
+                <span id="lbl-update-req">Action Required: KYC Update</span>
+            </h3>
+            <p class="text-red-600 text-sm mt-1" id="lbl-update-req-desc">Your documentation has expired or requires renewal.</p>
+        </div>
+
+        <!-- TAB NAV -->
+        <div class="flex gap-1 mb-6 p-1.5 panel overflow-x-auto custom-scrollbar" style="border-radius: 12px;">
+            <button class="tab-btn active" onclick="switchTab('dashboard')" id="tab-btn-dashboard">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" class="w-4 h-4"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+                <span id="lbl-tab-dashboard">Dashboard</span>
+            </button>
+            <button class="tab-btn" onclick="switchTab('shipments')" id="tab-btn-shipments">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5V8a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v8.5M3 16.5l2 3h14l2-3M3 16.5h18M8 11h4"/></svg>
+                <span id="lbl-tab-shipments">Shipments</span>
+            </button>
+            <button class="tab-btn" onclick="switchTab('offers')" id="tab-btn-offers">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3l2.09 4.26L19 8l-3.5 3.36L16.18 16 12 13.77 7.82 16l.68-4.64L5 8l4.91-.74L12 3z"/></svg>
+                <span id="lbl-tab-offers">Offers</span> <span class="count hidden" id="count-offers">0</span>
+            </button>
+            <button class="tab-btn" onclick="switchTab('rfq')" id="tab-btn-rfq">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h4M7 3h10a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/></svg>
+                <span id="lbl-tab-rfq">My RFQs</span>
+            </button>
+            <button class="tab-btn" onclick="switchTab('documents')" id="tab-btn-docs">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9l-7-7z"/><path stroke-linecap="round" stroke-linejoin="round" d="M13 2v7h7"/></svg>
+                <span id="lbl-tab-docs">Documents</span> <span class="count hidden" id="count-docs">0</span>
+            </button>
+            <button class="tab-btn" onclick="switchTab('catalog')" id="tab-btn-catalog">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h7"/></svg>
+                <span id="lbl-tab-catalog">Catalog</span>
+            </button>
+            <button class="tab-btn" onclick="switchTab('goods')" id="tab-btn-goods">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-14L4 7m8 4v10M4 7v10l8 4"/></svg>
+                <span id="lbl-tab-goods">My Products</span>
+            </button>
+            <button class="tab-btn" onclick="switchTab('kyc')" id="tab-btn-kyc">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6l7-3z"/></svg>
+                <span id="lbl-tab-kyc">KYC / Compliance</span>
+            </button>
+            <button class="tab-btn" onclick="switchTab('profile')" id="tab-btn-profile">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" class="w-4 h-4"><circle cx="12" cy="8" r="3.2"/><path stroke-linecap="round" stroke-linejoin="round" d="M5 20a7 7 0 0 1 14 0"/></svg>
+                <span id="lbl-tab-profile">Profile</span>
+            </button>
+        </div>
+
+        <!-- DASHBOARD -->
+        <div id="tab-dashboard" class="tab-content block space-y-6 fade-in">
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div class="stat-card">
+                    <p class="stat-label" id="lbl-stat-shipments">Active Shipments</p>
+                    <p class="stat-value" id="stat-shipments">0</p>
+                </div>
+                <div class="stat-card">
+                    <p class="stat-label" id="lbl-stat-offers">Open Offers</p>
+                    <p class="stat-value text-emerald-600" id="stat-offers">0</p>
+                </div>
+                <div class="stat-card">
+                    <p class="stat-label" id="lbl-stat-rfqs">Pending RFQs</p>
+                    <p class="stat-value text-amber-600" id="stat-rfqs">0</p>
+                </div>
+                <div class="stat-card">
+                    <p class="stat-label" id="lbl-stat-kyc">KYC Status</p>
+                    <p class="stat-value text-blue-600" id="stat-kyc">—</p>
+                </div>
+            </div>
+
+            <!-- FINANCIAL SUMMARY -->
+            <div class="panel p-6">
+                <h3 class="text-base font-semibold text-slate-900 mb-4">Financial Summary</h3>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                    <div>
+                        <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Total Business Volume</p>
+                        <p id="fin-total-spend" class="text-lg font-bold text-slate-900 mt-1">—</p>
+                    </div>
+                    <div>
+                        <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Open Offers Value</p>
+                        <p id="fin-open-offers" class="text-lg font-bold text-emerald-600 mt-1">—</p>
+                    </div>
+                    <div>
+                        <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Completed Deals</p>
+                        <p id="fin-completed-deals" class="text-lg font-bold text-blue-600 mt-1">0</p>
+                    </div>
+                    <div>
+                        <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Documents Available</p>
+                        <p id="fin-doc-count" class="text-lg font-bold text-slate-900 mt-1">0</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ACTIVE SHIPMENT TIMELINE -->
+            <div class="panel p-6" id="dash-timeline-wrap">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-base font-semibold text-slate-900">Active Shipment Progress</h3>
+                    <button class="text-xs font-semibold text-blue-600 hover:underline" onclick="switchTab('shipments')">Open shipments →</button>
+                </div>
+                <div id="dash-timeline" class="text-sm text-slate-400">No active shipments.</div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div class="panel p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-base font-semibold text-slate-900" id="lbl-recent-offers">Recent Offers</h3>
+                        <button class="text-xs font-semibold text-blue-600 hover:underline" onclick="switchTab('offers')" id="lbl-view-all-offers">View all →</button>
+                    </div>
+                    <div id="dash-offers" class="space-y-2 text-sm"></div>
+                </div>
+                <div class="panel p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-base font-semibold text-slate-900" id="lbl-recent-docs">Recent Documents</h3>
+                        <button class="text-xs font-semibold text-blue-600 hover:underline" onclick="switchTab('documents')" id="lbl-view-all-docs">View all →</button>
+                    </div>
+                    <div id="dash-docs" class="space-y-2 text-sm"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SHIPMENTS -->
+        <div id="tab-shipments" class="tab-content hidden space-y-4"><div id="deals-container" class="space-y-4"></div></div>
+
+        <!-- OFFERS -->
+        <div id="tab-offers" class="tab-content hidden space-y-4">
+            <div class="panel p-4 flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
+                <div class="search-wrap flex-1 max-w-md">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></svg>
+                    <input type="text" id="offers-search" class="search-input" placeholder="Search offers by product, offer no…" oninput="renderOffers()">
+                </div>
+                <div class="flex gap-2 flex-wrap">
+                    <span class="chip active" data-filter="all" onclick="setOffersFilter(this,'all')">All</span>
+                    <span class="chip" data-filter="pending" onclick="setOffersFilter(this,'pending')">Pending</span>
+                    <span class="chip" data-filter="accepted" onclick="setOffersFilter(this,'accepted')">Accepted</span>
+                    <span class="chip" data-filter="declined" onclick="setOffersFilter(this,'declined')">Declined</span>
+                </div>
+            </div>
+            <div id="offers-container" class="space-y-4"></div>
+        </div>
+
+        <!-- RFQ -->
+        <div id="tab-rfq" class="tab-content hidden">
+            <div class="panel p-6">
+                <div class="flex justify-between items-center pb-4 mb-5 border-b border-slate-100">
+                    <div>
+                        <h2 class="text-lg font-semibold text-slate-900" id="lbl-rfq-main-title">Requests for Quotation</h2>
+                        <p class="text-sm text-slate-500 mt-0.5" id="lbl-rfq-main-desc">Submit and track your purchasing requests.</p>
+                    </div>
+                    <button class="btn btn-primary" onclick="openRFQModal()" id="btn-new-rfq">+ New RFQ</button>
+                </div>
+                <div id="rfq-container" class="space-y-3"></div>
+            </div>
+        </div>
+
+        <!-- DOCUMENTS -->
+        <div id="tab-documents" class="tab-content hidden">
+            <div class="panel p-6">
+                <div class="pb-4 mb-5 border-b border-slate-100 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                    <div>
+                        <h2 class="text-lg font-semibold text-slate-900" id="lbl-docs-title">Document Vault</h2>
+                        <p class="text-sm text-slate-500 mt-0.5" id="lbl-docs-desc">Download your official offers, invoices and contracts. Every download is logged.</p>
+                    </div>
+                    <div class="flex gap-2">
+                        <button type="button" class="btn btn-ghost" onclick="showHiddenItems()" title="Vidi ranije uklonjene ponude/dokumente">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4"><path d="M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z"/><path d="M12 8v4l3 3"/></svg>
+                            <span>Hidden items</span>
+                        </button>
+                        <button type="button" class="btn btn-ghost" onclick="exportDocumentsHistory()">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4"><path d="M12 3v14m-5-5l5 5 5-5M5 21h14"/></svg>
+                            <span>Export history (CSV)</span>
+                        </button>
+                    </div>
+                </div>
+                <div class="flex flex-col md:flex-row gap-3 md:items-center mb-4">
+                    <div class="search-wrap flex-1 max-w-md">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></svg>
+                        <input type="text" id="docs-search" class="search-input" placeholder="Search documents by name or type…" oninput="renderDocuments()">
+                    </div>
+                    <div class="flex gap-2 flex-wrap">
+                        <span class="chip active" data-doc-filter="all" onclick="setDocsFilter(this,'all')">All</span>
+                        <span class="chip" data-doc-filter="OFFER" onclick="setDocsFilter(this,'OFFER')">Offers</span>
+                        <span class="chip" data-doc-filter="INVOICE" onclick="setDocsFilter(this,'INVOICE')">Invoices</span>
+                        <span class="chip" data-doc-filter="CONTRACT" onclick="setDocsFilter(this,'CONTRACT')">Contracts</span>
+                    </div>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-sm">
+                        <thead>
+                            <tr class="border-b border-slate-200 text-[11px] font-semibold text-slate-500 uppercase tracking-wide">
+                                <th class="py-3 px-3" id="th-doc-date">Date</th>
+                                <th class="py-3 px-3" id="th-doc-type">Type</th>
+                                <th class="py-3 px-3" id="th-doc-name">File</th>
+                                <th class="py-3 px-3 text-right" id="th-doc-action">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="documents-table-body" class="divide-y divide-slate-100"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- KYC (unchanged content, just wrapped in cleaner panel) -->
+        <div id="tab-kyc" class="tab-content hidden">
+            <div class="panel p-8">
+                <div class="mb-6 pb-4 border-b border-slate-100">
+                    <h2 class="text-xl font-bold text-slate-900 tracking-tight" id="lbl-kyc-title">Compliance &amp; KYC</h2>
+                    <p class="text-sm text-slate-500 mt-1" id="lbl-kyc-desc">Securely submit corporate data. Encrypted in an air-gapped vault.</p>
+                    <div id="kyc-status-line" class="mt-3 hidden"></div>
+                </div>
+
+                <!-- Instructions panel — pomaze klijentu da razume sta se trazi PRE nego sto pocne da unosi -->
+                <div class="mb-6 rounded-xl border border-blue-200 bg-blue-50/60 p-4">
+                    <div class="flex items-start gap-3">
+                        <span class="text-2xl leading-none">📋</span>
+                        <div class="flex-1 text-sm text-slate-700 space-y-2">
+                            <b class="text-slate-900">Before you start</b>
+                            <ul class="list-disc pl-4 space-y-1 text-xs">
+                                <li>Fields marked with <span class="text-red-500 font-bold">*</span> are <b>mandatory</b> — the form cannot be submitted without them.</li>
+                                <li>All data is <b>end-to-end encrypted</b> in a Fernet-AES vault and never leaves your account without your consent.</li>
+                                <li>For company entities you'll need: Reg No., VAT/Tax ID, directors' passports, and at least one bank account (IBAN + SWIFT/BIC).</li>
+                                <li>Individuals only need passport / ID scan and a recent utility bill (proof of home address, issued within last 3 months).</li>
+                                <li>Sanctions and PEP screening runs automatically after submission. If your entity is flagged, an admin will review manually.</li>
+                                <li>You can save partial progress and continue later — data persists on this device until submission.</li>
+                            </ul>
+                            <p class="text-xs text-slate-500 pt-1 italic">Need help? Contact your account manager or the compliance team.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <form id="kyc-form" class="space-y-8">
+                    <!-- 0. Entity type: Company (legal entity) vs Individual (private person)
+                         Sve legal-entity polja (Directors, UBO, Bank...) su vidljiva samo kod
+                         Company. Individual varijanta pita za dokaz adrese stanovanja (utility bill).
+                    -->
+                    <div class="space-y-3 pb-6 border-b border-slate-100">
+                        <h3 class="text-xs font-semibold text-blue-700 uppercase tracking-widest">0. Type of entity</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <label class="flex items-start gap-3 border border-slate-200 rounded-lg p-4 cursor-pointer hover:bg-slate-50 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50">
+                                <input type="radio" name="kyc-entity-type" value="company" checked class="mt-1"/>
+                                <span>
+                                    <span class="block text-sm font-semibold text-slate-900">Company / Legal entity</span>
+                                    <span class="block text-xs text-slate-500 mt-1">LLC, corporation, partnership, cooperative. Requires Reg. No, VAT, directors, UBO, banking details.</span>
+                                </span>
+                            </label>
+                            <label class="flex items-start gap-3 border border-slate-200 rounded-lg p-4 cursor-pointer hover:bg-slate-50 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50">
+                                <input type="radio" name="kyc-entity-type" value="individual" class="mt-1"/>
+                                <span>
+                                    <span class="block text-sm font-semibold text-slate-900">Individual / Private person</span>
+                                    <span class="block text-xs text-slate-500 mt-1">Requires passport / ID and a recent utility bill as proof of home address (electricity, phone, water, internet — issued within the last 3 months).</span>
+                                </span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- 1. Company details — sakriva se kad je entity=individual (labela postaje "Personal details") -->
+                    <div class="space-y-4 pb-6 border-b border-slate-100" id="kyc-sec-company">
+                        <h3 class="text-xs font-semibold text-blue-700 uppercase tracking-widest" id="lbl-kyc-sec1">1. Company Details</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                            <div>
+                                <label class="label required" id="lbl-reg-name">Registered Company Name</label>
+                                <input type="text" id="kyc-comp-name" class="input" required>
+                                <p class="field-help">Full legal name as registered with government authorities</p>
+                            </div>
+                            <div>
+                                <label class="label required" id="lbl-reg-no">Registration No.</label>
+                                <input type="text" id="kyc-reg-no" class="input" required>
+                                <p class="field-help">Company registration or incorporation number</p>
+                            </div>
+                            <div>
+                                <label class="label required" id="lbl-tax-id">Tax ID / VAT</label>
+                                <input type="text" id="kyc-tax-id" class="input" required>
+                                <p class="field-help">Tax identification or VAT registration number</p>
+                            </div>
+                            <div>
+                                <label class="label" id="lbl-website">Website</label>
+                                <input type="text" id="kyc-website" class="input" placeholder="https://...">
+                                <p class="field-help">Company website URL (optional)</p>
+                            </div>
+                            <div>
+                                <label class="label required" id="lbl-industry">Industry / Activity</label>
+                                <input type="text" id="kyc-industry" class="input" required>
+                                <p class="field-help">Primary business sector or NACE/SIC activity code</p>
+                            </div>
+                            <div>
+                                <label class="label required" id="lbl-kyc-phone">Contact Phone</label>
+                                <input type="text" id="kyc-contact-phone" class="input" required placeholder="+xxx...">
+                                <p class="field-help">Main business phone number with country code</p>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                            <div class="md:col-span-2">
+                                <label class="label required" id="lbl-reg-addr">Registered Address</label>
+                                <input type="text" id="kyc-reg-addr" class="input" required>
+                                <p class="field-help">Full street address as per company registration</p>
+                            </div>
+                            <div>
+                                <label class="label required" id="lbl-kyc-city">City</label>
+                                <input type="text" id="kyc-city" class="input" required>
+                            </div>
+                            <div>
+                                <label class="label required" id="lbl-kyc-country">Country</label>
+                                <input type="text" id="kyc-country" class="input" required>
+                            </div>
+                            <div>
+                                <label class="label" id="lbl-kyc-zip">ZIP / Postal Code</label>
+                                <input type="text" id="kyc-zip" class="input">
+                            </div>
+                            <div class="entity-company-only">
+                                <label class="label" id="lbl-op-addr">Operational Address</label>
+                                <input type="text" id="kyc-op-addr" class="input">
+                                <p class="field-help">If different from registered address (optional)</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 1b. Proof of home address — samo za Individual entitet.
+                         Skrivena za Company. Vidljivo tek kad je izabran Individual toggle. -->
+                    <div class="space-y-4 pb-6 border-b border-slate-100 hidden" id="kyc-sec-proof-address">
+                        <h3 class="text-xs font-semibold text-amber-700 uppercase tracking-widest">1b. Proof of Home Address <span class="text-red-500">*</span></h3>
+                        <p class="text-xs text-slate-600 bg-amber-50 border border-amber-200 rounded-lg p-3 leading-relaxed">
+                            Please upload one of the following as evidence of your current residential address. The document must clearly show your full name and address, and must be dated within the last 3 months:
+                            <span class="block mt-1 font-semibold text-amber-900">Electricity bill • Water bill • Internet / phone bill • Bank statement • Government-issued residency document</span>
+                        </p>
+                        <div>
+                            <label class="label required" id="lbl-proof-addr">Upload proof of address</label>
+                            <input type="file" id="kyc-proof-address" accept=".pdf,.png,.jpg,.jpeg" class="input">
+                            <p class="field-help">PDF, PNG or JPG — up to 15 MB. Bill must be issued in your name and show your home address.</p>
+                        </div>
+                    </div>
+
+                    <!-- 2. Banking -->
+                    <div class="space-y-4 pb-6 border-b border-slate-100" id="kyc-sec-banking">
+                        <h3 class="text-xs font-semibold text-blue-700 uppercase tracking-widest" id="lbl-kyc-sec2">2. Banking &amp; Financial Profile</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div>
+                                <label class="label required" id="lbl-bank-name">Bank Name</label>
+                                <input type="text" id="kyc-bank-name" class="input" required>
+                                <p class="field-help">Full name of your primary business bank</p>
+                            </div>
+                            <div>
+                                <label class="label required" id="lbl-bank-iban">IBAN / Account No.</label>
+                                <input type="text" id="kyc-bank-iban" class="input font-mono" required>
+                                <p class="field-help">International Bank Account Number or local account number</p>
+                                <div id="kyc-bank-iban-status" class="mt-1 text-xs font-semibold" style="min-height:1.1em;"></div>
+                            </div>
+                            <div>
+                                <label class="label required" id="lbl-bank-swift">SWIFT / BIC</label>
+                                <input type="text" id="kyc-bank-swift" class="input font-mono" required>
+                                <p class="field-help">Bank identification code for international wire transfers</p>
+                                <div id="kyc-bank-swift-status" class="mt-1 text-xs font-semibold" style="min-height:1.1em;"></div>
+                            </div>
+                            <div class="md:col-span-2">
+                                <label class="label required" id="lbl-bank-addr">Bank Branch Address</label>
+                                <input type="text" id="kyc-bank-addr" class="input" required>
+                                <p class="field-help">Full address of the bank branch where the account is held</p>
+                            </div>
+                            <div class="entity-company-only">
+                                <label class="label" id="lbl-corr-bank">Correspondent Bank</label>
+                                <input type="text" id="kyc-corr-bank" class="input">
+                                <p class="field-help">Intermediary bank for international transfers, if applicable</p>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                            <div class="entity-company-only">
+                                <label class="label required" id="lbl-turnover">Expected Annual Volume (USD)</label>
+                                <input type="text" id="kyc-turnover" class="input font-mono" required>
+                                <p class="field-help">Estimated yearly trade volume in US dollars</p>
+                            </div>
+                            <div>
+                                <label class="label required" id="lbl-sof">Source of Funds / Wealth</label>
+                                <input type="text" id="kyc-sof" class="input" required>
+                                <p class="field-help" id="hlp-sof-scope">Origin of business capital (e.g. trade revenue, investment, loans). For individuals: employment, savings, inheritance, etc.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 3. Structure — SAMO za Company entitet. Individualci nemaju directors/UBO. -->
+                    <div class="space-y-4 pb-6 border-b border-slate-100 entity-company-only">
+                        <h3 class="text-xs font-semibold text-blue-700 uppercase tracking-widest" id="lbl-kyc-sec3">3. Directors &amp; UBOs</h3>
+                        <div class="card p-4">
+                            <div class="flex justify-between items-center mb-2">
+                                <h4 class="text-sm font-semibold text-slate-800" id="lbl-dir-title">Directors / Managers</h4>
+                                <button type="button" class="btn btn-ghost small text-xs" onclick="addDirector()" id="btn-add-dir">+ Add Director</button>
+                            </div>
+                            <p class="field-help mb-3">List all directors, managers, and authorized signatories. Full name, passport number, and nationality are required for each person.</p>
+                            <div id="directors-container" class="space-y-3"></div>
+                        </div>
+                        <div class="card p-4">
+                            <div class="flex justify-between items-center mb-2">
+                                <h4 class="text-sm font-semibold text-slate-800" id="lbl-ubo-title">Ultimate Beneficial Owners (&gt;25%)</h4>
+                                <button type="button" class="btn btn-ghost small text-xs" onclick="addUBO()" id="btn-add-ubo">+ Add UBO</button>
+                            </div>
+                            <p class="field-help mb-3">List all individuals who directly or indirectly own more than 25% of the company. This is a regulatory requirement.</p>
+                            <div id="ubos-container" class="space-y-3"></div>
+                        </div>
+                    </div>
+
+                    <!-- 4. AML -->
+                    <div class="space-y-4 pb-6 border-b border-slate-100">
+                        <h3 class="text-xs font-semibold text-blue-700 uppercase tracking-widest" id="lbl-kyc-sec4">4. AML / CFT Compliance</h3>
+                        <p class="field-help mb-3">Answer each question truthfully. Checking a box does not disqualify your application — it triggers additional due diligence as required by international regulations.</p>
+                        <div class="card p-4 space-y-3">
+                            <label class="flex items-start gap-3 text-sm text-slate-800 cursor-pointer"><input type="checkbox" id="kyc-pep" class="mt-0.5 w-4 h-4"><span id="lbl-pep">Any owner/director is a Politically Exposed Person (PEP)?</span></label>
+                            <label class="flex items-start gap-3 text-sm text-slate-800 cursor-pointer"><input type="checkbox" id="kyc-sanctions" class="mt-0.5 w-4 h-4"><span id="lbl-sanctions">Subject to any UN/OFAC international sanctions?</span></label>
+                            <label class="flex items-start gap-3 text-sm text-slate-800 cursor-pointer"><input type="checkbox" id="kyc-litigation" class="mt-0.5 w-4 h-4"><span id="lbl-litigation">Involved in any AML/CFT litigation?</span></label>
+                            <label class="flex items-start gap-3 text-sm text-slate-800 cursor-pointer"><input type="checkbox" id="kyc-dualuse" class="mt-0.5 w-4 h-4"><span id="lbl-dualuse">Trades in Dual-Use goods or military equipment?</span></label>
+                        </div>
+                    </div>
+
+                    <!-- 5. Documents — Corporate documents (Trade License, Incorporation)
+                         su company-only. Passport ostaje relevantno i za individualce (osnovni ID). -->
+                    <div class="space-y-4 pb-6 border-b border-slate-100">
+                        <div class="flex justify-between items-center">
+                            <h3 class="text-xs font-semibold text-blue-700 uppercase tracking-widest" id="lbl-kyc-sec5">5. Identity &amp; Documents</h3>
+                            <p class="text-xs text-slate-500" id="lbl-upload-multi">You can select multiple files per category</p>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div class="card p-5 text-center entity-company-only">
+                                <p class="text-sm font-semibold text-slate-800 mb-1" id="lbl-up-license">Trade License(s)</p>
+                                <p class="field-help mb-2">Current trade or business license issued by authorities</p>
+                                <input type="file" id="file-license" class="text-xs w-full" accept=".pdf,.jpg,.png" multiple>
+                            </div>
+                            <div class="card p-5 text-center">
+                                <p class="text-sm font-semibold text-slate-800 mb-1" id="lbl-up-pass">Passport / National ID</p>
+                                <p class="field-help mb-2" id="hlp-passport-scope">For companies: scans of passports for all listed directors and UBOs. For individuals: your own passport or national ID.</p>
+                                <input type="file" id="file-passport" class="text-xs w-full" accept=".pdf,.jpg,.png" multiple>
+                            </div>
+                            <div class="card p-5 text-center entity-company-only">
+                                <p class="text-sm font-semibold text-slate-800 mb-1" id="lbl-up-inc">Cert. of Incorporation / MoA</p>
+                                <p class="field-help mb-2">Certificate of incorporation, memorandum of association, or equivalent</p>
+                                <input type="file" id="file-inc" class="text-xs w-full" accept=".pdf,.jpg,.png" multiple>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 6. Declaration -->
+                    <div class="card p-5 bg-blue-50/40 border-blue-200/60">
+                        <h3 class="text-xs font-semibold text-blue-900 uppercase tracking-widest mb-3" id="lbl-decl-title">Declaration &amp; Consent</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                            <input type="text" id="kyc-sub-name" placeholder="Submitter Full Name" class="input" required>
+                            <input type="text" id="kyc-sub-title" placeholder="Designation / Job Title" class="input" required>
+                        </div>
+                        <label class="flex items-start gap-3 text-xs text-slate-800 cursor-pointer">
+                            <input type="checkbox" id="kyc-consent" class="mt-0.5 w-4 h-4" required>
+                            <span id="lbl-consent">I declare the information is true and accurate, and consent to secure storage and processing.</span>
+                        </label>
+                    </div>
+
+                    <div class="flex justify-end">
+                        <button type="submit" id="btn-kyc-submit" class="btn btn-primary px-8 py-3">Submit Securely</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- QUOTE REQUEST MODAL — profesionalna zamena za native prompt().
+             Otvara se iz kataloga (openQuoteRequest) i pruža strukturiran unos:
+             ko traži (ja / u ime treće firme), Incoterm, luka/adresa, banka,
+             logistika, način plaćanja. Automatski prilagođava obavezna polja
+             prema Incotermu i prikazuje AUTOMATION HINTS (npr. za CIF: 'dodatno
+             vreme za konverziju', za EXW: 'obavezan logistički agent'). -->
+        <div id="quote-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+            <div class="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[92vh] flex flex-col overflow-hidden">
+                <div class="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50">
+                    <div>
+                        <h3 class="text-lg font-bold text-slate-900">Request Quote</h3>
+                        <p class="text-xs text-slate-500 mt-0.5" id="quote-modal-subtitle">Provide details so our team can prepare an accurate offer.</p>
+                    </div>
+                    <button type="button" onclick="closeQuoteModal()" class="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-red-500 hover:text-white text-slate-500 transition-colors">✕</button>
+                </div>
+                <form id="quote-form" class="overflow-y-auto flex-1 p-6 space-y-5">
+                    <input type="hidden" id="quote-product-id">
+                    <input type="hidden" id="quote-product-name">
+                    <input type="hidden" id="quote-product-unit">
+
+                    <!-- REQUESTOR — za sebe ili u ime treće firme -->
+                    <div>
+                        <label class="block text-xs font-bold uppercase tracking-widest text-slate-500 mb-2">Requesting on behalf of *</label>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                            <label class="flex items-start gap-2 border border-slate-200 rounded-lg p-3 cursor-pointer hover:bg-slate-50">
+                                <input type="radio" name="quote-requestor" value="self" checked class="mt-1"/>
+                                <span>
+                                    <span class="block text-sm font-semibold text-slate-900">My company</span>
+                                    <span class="block text-[11px] text-slate-500">Quote will be issued to my company.</span>
+                                </span>
+                            </label>
+                            <label class="flex items-start gap-2 border border-slate-200 rounded-lg p-3 cursor-pointer hover:bg-slate-50">
+                                <input type="radio" name="quote-requestor" value="third_party" class="mt-1"/>
+                                <span>
+                                    <span class="block text-sm font-semibold text-slate-900">Third-party buyer</span>
+                                    <span class="block text-[11px] text-slate-500">I represent another buyer; provide their details.</span>
+                                </span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Third-party buyer block (visible only when radio=third_party) -->
+                    <div id="third-party-buyer-block" class="hidden bg-amber-50 border border-amber-200 rounded-lg p-4">
+                        <h4 class="text-sm font-bold text-amber-900 mb-3">End-buyer details</h4>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div class="md:col-span-2"><label class="block text-[11px] font-semibold text-slate-600 mb-1">Company name *</label><input type="text" id="qb-company" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"/></div>
+                            <div><label class="block text-[11px] font-semibold text-slate-600 mb-1">Tax ID / VAT</label><input type="text" id="qb-taxid" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-blue-500 outline-none"/></div>
+                            <div><label class="block text-[11px] font-semibold text-slate-600 mb-1">Country</label><input type="text" id="qb-country" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"/></div>
+                            <div><label class="block text-[11px] font-semibold text-slate-600 mb-1">Contact email</label><input type="email" id="qb-email" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"/></div>
+                            <div><label class="block text-[11px] font-semibold text-slate-600 mb-1">Contact phone</label><input type="text" id="qb-phone" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"/></div>
+                        </div>
+                    </div>
+
+                    <!-- QUANTITY / TARGET PRICE -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <div>
+                            <label class="block text-xs font-bold uppercase tracking-widest text-slate-500 mb-2">Quantity *</label>
+                            <div class="flex gap-2">
+                                <input type="number" step="0.01" min="0.01" id="quote-qty" required class="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-blue-500 outline-none"/>
+                                <span id="quote-unit-label" class="inline-flex items-center px-3 py-2 text-xs font-bold text-slate-500 bg-slate-100 border border-slate-300 rounded-lg">unit</span>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold uppercase tracking-widest text-slate-500 mb-2">Target price</label>
+                            <div class="flex gap-2">
+                                <input type="number" step="0.01" id="quote-target-price" placeholder="Optional" class="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-blue-500 outline-none"/>
+                                <select id="quote-currency" data-populate="currencies" class="px-2 py-2 border border-slate-300 rounded-lg text-sm font-bold focus:ring-2 focus:ring-blue-500 outline-none">
+                                    <option value="USD">USD</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold uppercase tracking-widest text-slate-500 mb-2">Needed by</label>
+                            <input type="date" id="quote-deadline" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"/>
+                        </div>
+                    </div>
+
+                    <!-- INCOTERM (dropdown Incoterms 2020) + DELIVERY LOCATION -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-bold uppercase tracking-widest text-slate-500 mb-2">Incoterm *</label>
+                            <select id="quote-incoterm" required class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm font-bold focus:ring-2 focus:ring-blue-500 outline-none">
+                                <option value="">Select…</option>
+                                <optgroup label="Any mode">
+                                    <option value="EXW">EXW – Ex Works</option>
+                                    <option value="FCA">FCA – Free Carrier</option>
+                                    <option value="CPT">CPT – Carriage Paid To</option>
+                                    <option value="CIP">CIP – Carriage & Insurance Paid</option>
+                                    <option value="DAP">DAP – Delivered at Place</option>
+                                    <option value="DPU">DPU – Delivered at Place Unloaded</option>
+                                    <option value="DDP">DDP – Delivered Duty Paid</option>
+                                </optgroup>
+                                <optgroup label="Sea / inland waterway">
+                                    <option value="FAS">FAS – Free Alongside Ship</option>
+                                    <option value="FOB">FOB – Free on Board</option>
+                                    <option value="CFR">CFR – Cost & Freight</option>
+                                    <option value="CIF">CIF – Cost, Insurance & Freight</option>
+                                </optgroup>
+                            </select>
+                        </div>
+                        <div>
+                            <label id="quote-loc-label" class="block text-xs font-bold uppercase tracking-widest text-slate-500 mb-2">Delivery location *</label>
+                            <input type="text" id="quote-destination" placeholder="Please select an Incoterm first" required class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"/>
+                            <p id="quote-loc-hint" class="text-[11px] text-slate-500 mt-1"></p>
+                        </div>
+                    </div>
+
+                    <!-- LOGISTICS AGENT — obavezan za EXW/FCA/FAS (klijent preuzima) -->
+                    <div id="quote-logistics-block" class="hidden bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <h4 class="text-sm font-bold text-blue-900 mb-1">Logistics arrangement</h4>
+                        <p class="text-[11px] text-blue-800 mb-3">For this Incoterm the goods will be collected by <strong>your</strong> logistics provider. Please tell us which forwarder/agent will handle pickup so we can coordinate loading and documents.</p>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div><label class="block text-[11px] font-semibold text-slate-600 mb-1">Freight forwarder / agent *</label><input type="text" id="quote-agent" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"/></div>
+                            <div><label class="block text-[11px] font-semibold text-slate-600 mb-1">Agent contact (email/phone)</label><input type="text" id="quote-agent-contact" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"/></div>
+                        </div>
+                    </div>
+
+                    <!-- PAYMENT TERMS + BANK -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-bold uppercase tracking-widest text-slate-500 mb-2">Payment terms *</label>
+                            <select id="quote-payment" required class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none">
+                                <option value="">Select…</option>
+                                <option value="TT_100_advance">100% T/T in advance</option>
+                                <option value="TT_50_50">50% advance / 50% before shipment</option>
+                                <option value="TT_30_70">30% advance / 70% against B/L copy</option>
+                                <option value="TT_30_days">T/T 30 days after B/L</option>
+                                <option value="TT_60_days">T/T 60 days after B/L</option>
+                                <option value="LC_sight">L/C at sight (Irrevocable, Confirmed)</option>
+                                <option value="LC_30_days">L/C 30 days after B/L</option>
+                                <option value="LC_60_days">L/C 60 days after B/L</option>
+                                <option value="LC_90_days">L/C 90 days after B/L</option>
+                                <option value="CAD">Cash Against Documents (D/P)</option>
+                                <option value="DA">Documents Against Acceptance (D/A)</option>
+                                <option value="Escrow">Escrow / Trade Assurance</option>
+                                <option value="OpenAccount">Open Account (existing relationship)</option>
+                                <option value="Other">Other (specify in notes)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold uppercase tracking-widest text-slate-500 mb-2" id="quote-bank-label">Buyer bank</label>
+                            <input type="text" id="quote-bank" placeholder="Bank name / SWIFT (if known)" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"/>
+                            <p class="text-[11px] text-slate-500 mt-1">The bank that will fund this transaction on the buyer side.</p>
+                        </div>
+                    </div>
+
+                    <!-- NOTES -->
+                    <div>
+                        <label class="block text-xs font-bold uppercase tracking-widest text-slate-500 mb-2">Additional notes / packaging / certificates</label>
+                        <textarea id="quote-notes" rows="3" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Packaging, certificates required, delivery window, special handling…"></textarea>
+                    </div>
+
+                    <!-- AUTOMATION HINTS — dinamički prikazuju upozorenja u zavisnosti od izbora -->
+                    <div id="quote-hints" class="hidden space-y-2"></div>
+                </form>
+                <div class="flex items-center justify-end gap-2 px-6 py-4 border-t border-slate-200 bg-slate-50">
+                    <button type="button" onclick="closeQuoteModal()" class="px-5 py-2 border border-slate-300 text-slate-700 rounded-lg text-sm font-semibold hover:bg-slate-100">Cancel</button>
+                    <button type="button" onclick="submitQuoteRequest()" id="btn-submit-quote" class="px-6 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold hover:bg-blue-700 shadow-sm">Send Quote Request</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- CATALOG (roba koju je admin obeležio kao vidljivu klijentu, bez cena) -->
+        <div id="tab-catalog" class="tab-content hidden">
+            <div class="panel p-6">
+                <div class="flex justify-between items-center pb-4 mb-5 border-b border-slate-100">
+                    <div>
+                        <h2 class="text-lg font-semibold text-slate-900" id="lbl-catalog-title">Product Catalog</h2>
+                        <p class="text-sm text-slate-500 mt-0.5" id="lbl-catalog-desc">Browse products available to you. Request a quote for anything of interest.</p>
+                    </div>
+                    <input id="catalog-search" placeholder="Search catalog…" class="border border-slate-300 rounded-lg px-3 py-2 text-sm w-64 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"/>
+                </div>
+                <div id="catalog-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+                <div id="catalog-empty" class="hidden text-center text-slate-500 py-16 border-2 border-dashed border-slate-200 rounded-xl">
+                    No products are currently available in your catalog. Please contact your account manager.
+                </div>
+            </div>
+        </div>
+
+        <!-- GOODS / MY PRODUCTS -->
+        <div id="tab-goods" class="tab-content hidden">
+            <div class="panel p-6">
+                <div class="flex justify-between items-center pb-4 mb-5 border-b border-slate-100">
+                    <div>
+                        <h2 class="text-lg font-semibold text-slate-900" id="lbl-goods-title">My Products</h2>
+                        <p class="text-sm text-slate-500 mt-0.5" id="lbl-goods-desc">Add products with full specifications. Admin will review and publish to the catalog.</p>
+                    </div>
+                    <button class="btn btn-primary" onclick="openProductModal()" id="btn-new-product">+ Add Product</button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-sm">
+                        <thead>
+                            <tr class="border-b border-slate-200 text-[11px] font-semibold text-slate-500 uppercase tracking-wide">
+                                <th class="py-3 px-3" id="th-prod-name">Product</th>
+                                <th class="py-3 px-3" id="th-prod-price">Price</th>
+                                <th class="py-3 px-3" id="th-prod-specs">Specifications</th>
+                                <th class="py-3 px-3" id="th-prod-status">Status</th>
+                                <th class="py-3 px-3 text-right" id="th-prod-actions">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="goods-table-body" class="divide-y divide-slate-100"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- PROFILE -->
+        <div id="tab-profile" class="tab-content hidden">
+            <div class="panel p-6 max-w-3xl mx-auto">
+                <div class="pb-4 mb-5 border-b border-slate-100">
+                    <h2 class="text-lg font-semibold text-slate-900" id="lbl-profile-title">Profile Settings</h2>
+                    <p class="text-sm text-slate-500 mt-0.5" id="lbl-profile-desc">Request updates to your contact details. Admin approval is required for changes to apply.</p>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div><label class="label" id="lbl-profile-email">Email</label><input type="email" id="profile-email" class="input"></div>
+                    <div><label class="label" id="lbl-profile-phone">Phone</label><input type="text" id="profile-phone" class="input"></div>
+                    <div><label class="label" id="lbl-profile-person">Contact Person</label><input type="text" id="profile-person" class="input"></div>
+                    <div><label class="label" id="lbl-profile-city">City</label><input type="text" id="profile-city" class="input"></div>
+                    <div class="md:col-span-2"><label class="label" id="lbl-profile-street">Street &amp; No.</label><input type="text" id="profile-street" class="input"></div>
+                    <div><label class="label" id="lbl-profile-country">Country</label><input type="text" id="profile-country" class="input"></div>
+                    <div><label class="label" id="lbl-profile-note">Note for admin (optional)</label><input type="text" id="profile-note" class="input"></div>
+                </div>
+                <div class="mt-5 flex justify-end">
+                    <button class="btn btn-primary" onclick="submitProfileChangeRequest()" id="btn-save-profile">Send for approval</button>
+                </div>
+
+                <div id="profile-requests-list" class="mt-8 pt-6 border-t border-slate-100">
+                    <h3 class="text-sm font-semibold text-slate-800 mb-3" id="lbl-profile-history">Your Change Requests</h3>
+                    <div id="profile-requests-body" class="space-y-2"></div>
+                </div>
+
+                <!-- Change Password (Supabase Auth) — vidljivo samo ako je USE_SUPABASE_AUTH aktivan -->
+                <div id="change-password-section" class="mt-8 pt-6 border-t border-slate-100 hidden">
+                    <h3 class="text-sm font-semibold text-slate-800 mb-3">🔑 Change Password</h3>
+                    <p class="text-xs text-slate-500 mb-3">Change your portal sign-in password. You'll stay signed in.</p>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl">
+                        <div><label class="label">Current password</label><input type="password" id="pwd-current" class="input" autocomplete="current-password"></div>
+                        <div><label class="label">New password (min. 8)</label><input type="password" id="pwd-new" class="input" autocomplete="new-password"></div>
+                    </div>
+                    <div class="mt-4 flex items-center gap-3">
+                        <button class="btn btn-primary" onclick="submitChangePassword()">Change Password</button>
+                        <span id="pwd-msg" class="text-xs"></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script nonce="{{ g.csp_nonce }}">
+        // Show change-password section only when USE_SUPABASE_AUTH is on
+        (async function(){
+            try {
+                const r = await fetch('/api/portal/public_config');
+                const c = await r.json();
+                if (c.supabase_auth_enabled) {
+                    const el = document.getElementById('change-password-section');
+                    if (el) el.classList.remove('hidden');
+                }
+            } catch(_) {}
+        })();
+
+        async function submitChangePassword() {
+            const cur = document.getElementById('pwd-current').value;
+            const nw = document.getElementById('pwd-new').value;
+            const msg = document.getElementById('pwd-msg');
+            msg.textContent = ''; msg.className = 'text-xs';
+            if (!cur || !nw) { msg.textContent = 'Both fields required.'; msg.classList.add('text-red-600'); return; }
+            if (nw.length < 8) { msg.textContent = 'New password must be at least 8 characters.'; msg.classList.add('text-red-600'); return; }
+
+            // portal_token je u URL-u; auth_key u sessionStorage kao 'portal_auth_' + token
+            const parts = window.location.pathname.split('/').filter(Boolean);
+            const portalToken = parts[parts.length - 1] || '';
+            const authKey = sessionStorage.getItem('portal_auth_' + portalToken) || '';
+
+            try {
+                const res = await fetch('/api/portal/user/change-password', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-Portal-Auth': authKey },
+                    body: JSON.stringify({ portal_token: portalToken, current_password: cur, new_password: nw })
+                });
+                let body = {};
+                try { body = await res.json(); } catch (_) {}
+                if (res.ok && body.status === 'success') {
+                    msg.textContent = '✓ ' + (body.message || 'Password changed.');
+                    msg.classList.add('text-emerald-600');
+                    document.getElementById('pwd-current').value = '';
+                    document.getElementById('pwd-new').value = '';
+                    if (typeof showToast === 'function') showToast('Password updated successfully.', 'success');
+                } else {
+                    const errTxt = body.error || body.message || 'Error changing password.';
+                    msg.textContent = errTxt;
+                    msg.classList.add('text-red-600');
+                    // 500 sa request_id → prikazi ID u toastu da klijent moze da javi adminu
+                    if (res.status >= 500 && body.request_id && typeof showToast === 'function') {
+                        showToast(errTxt, 'error', { requestId: body.request_id });
+                    }
+                }
+            } catch (e) {
+                msg.textContent = 'Network error.'; msg.classList.add('text-red-600');
+                if (typeof showToast === 'function') showToast('Network error while changing password.', 'error');
+            }
+        }
+    </script>
+
+    <!-- RFQ MODAL -->
+    <div id="rfq-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 hidden items-center justify-center p-3 sm:p-4">
+        <div class="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-lg w-full overflow-hidden max-h-[92vh] flex flex-col">
+            <div class="flex justify-between items-start border-b border-slate-100 px-5 sm:px-6 py-4">
+                <div>
+                    <h3 class="text-base sm:text-lg font-bold text-slate-900" id="lbl-rfq-modal-title">Request for Quotation (RFQ)</h3>
+                    <p class="text-xs text-slate-500 mt-1">Tell us what you need — we'll send you a formal offer.</p>
+                </div>
+                <button class="icon-btn" onclick="closeRFQModal()" aria-label="Close">✕</button>
+            </div>
+            <div class="p-5 sm:p-6 space-y-5 overflow-y-auto">
+                <div>
+                    <label class="label flex items-center gap-1" id="lbl-rfq-prod">
+                        <span>Product / Commodity</span>
+                        <span class="text-red-500 font-bold">*</span>
+                    </label>
+                    <input type="text" id="rfq-product" class="input mt-1" required placeholder="e.g. Arabica coffee, grade 1 washed"/>
+                    <p class="text-xs text-slate-500 mt-1.5">Full name of the goods you're sourcing. Include grade/quality if relevant.</p>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                    <div>
+                        <label class="label flex items-center gap-1" id="lbl-rfq-qty">
+                            <span>Target Quantity</span>
+                            <span class="text-red-500 font-bold">*</span>
+                        </label>
+                        <input type="number" id="rfq-qty" class="input mt-1" required min="0.001" step="0.001" placeholder="e.g. 20"/>
+                        <p class="text-xs text-slate-500 mt-1.5">Amount in metric tons (MT) unless otherwise specified in notes.</p>
+                    </div>
+                    <div>
+                        <label class="label" id="lbl-rfq-price">Target Price (optional)</label>
+                        <input type="number" step="0.01" id="rfq-price" class="input mt-1" min="0" placeholder="e.g. 4500"/>
+                        <p class="text-xs text-slate-500 mt-1.5">Your budget per unit (USD). We'll match if possible.</p>
+                    </div>
+                </div>
+                <div>
+                    <label class="label" id="lbl-rfq-notes">Notes / Specifications</label>
+                    <textarea id="rfq-notes" rows="4" class="input mt-1" placeholder="Preferred Incoterm, delivery port, packaging, timeline, certifications required, etc."></textarea>
+                    <p class="text-xs text-slate-500 mt-1.5">The more detail you provide, the more accurate our quote will be.</p>
+                </div>
+            </div>
+            <div class="bg-slate-50 p-4 sm:p-5 border-t border-slate-200 flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-3">
+                <button type="button" class="btn btn-ghost w-full sm:w-auto" onclick="closeRFQModal()" id="btn-rfq-cancel">Cancel</button>
+                <button type="button" class="btn btn-primary w-full sm:w-auto" onclick="submitRFQ()" id="btn-rfq-send">📤 Send Request</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- PRODUCT MODAL -->
+    <div id="product-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-4xl w-full overflow-hidden flex flex-col max-h-[92vh]">
+            <div class="flex justify-between items-center border-b border-slate-100 px-6 py-4">
+                <h3 class="text-lg font-semibold text-slate-900" id="product-modal-title">Product Details</h3>
+                <button class="icon-btn" onclick="closeProductModal()">✕</button>
+            </div>
+            <div class="flex gap-1 px-4 py-2 border-b border-slate-100 overflow-x-auto custom-scrollbar">
+                <button type="button" class="ptab-btn tab-btn active" data-target="ptab-general" id="lbl-ptab-general">General Info</button>
+                <button type="button" class="ptab-btn tab-btn" data-target="ptab-commercial" id="lbl-ptab-commercial">Pricing &amp; Terms</button>
+                <button type="button" class="ptab-btn tab-btn" data-target="ptab-specs" id="lbl-ptab-specs">Specs &amp; Logistics</button>
+                <button type="button" class="ptab-btn tab-btn" data-target="ptab-packaging" id="lbl-ptab-packaging">Packaging &amp; Stock</button>
+            </div>
+            <div class="overflow-y-auto p-6 flex-1 min-h-0 custom-scrollbar" style="background: var(--p-bg);">
+                <form id="product-form" class="space-y-6">
+                    <input type="hidden" id="form-product-id">
+
+                    <div id="ptab-general" class="ptab-pane block space-y-4">
+                        <!-- OWNERSHIP: da li je ovo klijentova roba ili robe partnera/preprodavca.
+                             Ako izabere "third_party", ispod se prikazuju polja o firmi ciju robu unosi. -->
+                        <div class="card p-5">
+                            <label class="label">Ownership of this product *</label>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2">
+                                <label class="flex items-start gap-3 border border-slate-200 rounded-lg p-3 cursor-pointer hover:bg-slate-50">
+                                    <input type="radio" name="form-product-ownership" value="own" checked class="mt-1"/>
+                                    <span>
+                                        <span class="block font-semibold text-slate-900 text-sm">This is my company's product</span>
+                                        <span class="block text-xs text-slate-500 mt-0.5">I own or manufacture this product directly.</span>
+                                    </span>
+                                </label>
+                                <label class="flex items-start gap-3 border border-slate-200 rounded-lg p-3 cursor-pointer hover:bg-slate-50">
+                                    <input type="radio" name="form-product-ownership" value="third_party" class="mt-1"/>
+                                    <span>
+                                        <span class="block font-semibold text-slate-900 text-sm">Product from another supplier</span>
+                                        <span class="block text-xs text-slate-500 mt-0.5">I represent this product for another company (supplier / friend / reseller).</span>
+                                    </span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Third-party source company panel — prikazuje se samo kad je 'third_party' odabrano. -->
+                        <div class="card p-5 hidden" id="third-party-panel">
+                            <div class="flex items-center gap-2 pb-3 border-b border-slate-100 mb-4">
+                                <svg class="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M4.93 19h14.14a2 2 0 0 0 1.73-3l-7.07-12.24a2 2 0 0 0-3.46 0L3.2 16a2 2 0 0 0 1.73 3z"/></svg>
+                                <h4 class="text-sm font-semibold text-slate-900">Source company details</h4>
+                                <span class="text-[10px] font-bold uppercase tracking-wider text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5">Required</span>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div class="md:col-span-2"><label class="label">Company / Manufacturer name *</label><input type="text" id="src-company-name" class="input"></div>
+                                <div><label class="label">Tax ID / VAT *</label><input type="text" id="src-company-taxid" class="input font-mono"></div>
+                                <div><label class="label">Relationship</label>
+                                    <select id="src-company-relationship" class="input">
+                                        <option value="supplier">Supplier</option>
+                                        <option value="reseller">Reseller</option>
+                                        <option value="friend">Friend / Business partner</option>
+                                        <option value="manufacturer">Manufacturer</option>
+                                        <option value="other">Other</option>
+                                    </select>
+                                </div>
+                                <div><label class="label">Country</label><input type="text" id="src-company-country" class="input"></div>
+                                <div><label class="label">City</label><input type="text" id="src-company-city" class="input"></div>
+                                <div class="md:col-span-2"><label class="label">Address</label><input type="text" id="src-company-address" class="input"></div>
+                                <div><label class="label">Website</label><input type="text" id="src-company-website" class="input" placeholder="https://…"></div>
+                                <div><label class="label">Contact email</label><input type="email" id="src-company-email" class="input"></div>
+                                <div><label class="label">Contact phone</label><input type="text" id="src-company-phone" class="input"></div>
+                                <div class="md:col-span-2"><label class="label">Notes about this company</label><textarea id="src-company-notes" class="input" rows="2"></textarea></div>
+                            </div>
+                            <p class="text-[11px] text-slate-500 mt-3 leading-relaxed">The administrator will review this source company and, if approved, register it as a partner in the system linked back to you as the introducer.</p>
+                        </div>
+
+                        <div class="card p-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="md:col-span-2">
+                                <label class="label required">Product Name</label>
+                                <input type="text" id="form-product-name" class="input" required placeholder="e.g. Refined White Sugar ICUMSA 45">
+                                <p class="field-help">Full commercial name of the product. Include grade/quality if relevant.</p>
+                            </div>
+                            <div>
+                                <label class="label">Category</label>
+                                <input type="text" id="form-product-category" class="input" placeholder="e.g. Food & Beverages">
+                                <p class="field-help">Group this product belongs to (helps buyers browse).</p>
+                            </div>
+                            <div>
+                                <label class="label">HS Code</label>
+                                <input type="text" id="form-product-hscode" class="input font-mono" placeholder="e.g. 170199" pattern="[0-9]{4,10}">
+                                <p class="field-help">Harmonized System customs classification (6-10 digits).</p>
+                            </div>
+                            <div>
+                                <label class="label">SKU / Article No.</label>
+                                <input type="text" id="form-product-sku" class="input font-mono" placeholder="Internal code">
+                                <p class="field-help">Your internal reference for stock tracking.</p>
+                            </div>
+                            <div>
+                                <label class="label">Brand / Manufacturer</label>
+                                <input type="text" id="form-product-brand" class="input" placeholder="Brand name">
+                                <p class="field-help">Leave empty if unbranded / generic.</p>
+                            </div>
+                            <div class="md:col-span-2">
+                                <label class="label">Short Description</label>
+                                <input type="text" id="form-product-shortdesc" class="input" placeholder="One-line description shown in the catalog card" maxlength="200">
+                                <p class="field-help">Maximum 200 characters. Shown to buyers in the catalog listing.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="ptab-commercial" class="ptab-pane hidden space-y-4">
+                        <div class="card p-5">
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div class="md:col-span-1">
+                                    <label class="label required">Selling Price (per unit)</label>
+                                    <input type="number" step="0.01" min="0" id="form-product-price" class="input font-mono text-lg font-bold text-blue-700" required placeholder="0.00">
+                                    <p class="field-help">Price per single unit (before currency).</p>
+                                </div>
+                                <div>
+                                    <label class="label">Currency</label>
+                                    <select id="form-product-currency" data-populate="currencies" class="input">
+                                        <option value="USD">USD — US Dollar</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="label required">Unit</label>
+                                    <input type="text" id="form-product-unit" class="input" placeholder="MT, kg, pcs, ltr" required maxlength="20">
+                                    <p class="field-help">Metric ton, kg, pieces, liter, etc.</p>
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-5 pt-5 border-t border-slate-200">
+                                <div>
+                                    <label class="label">Min Order Quantity (MOQ)</label>
+                                    <input type="number" min="0" step="0.01" id="form-product-moq" class="input font-mono" placeholder="0">
+                                    <p class="field-help">Lowest quantity accepted per order.</p>
+                                </div>
+                                <div>
+                                    <label class="label">Incoterm</label>
+                                    <select id="form-product-incoterm" data-populate="incoterms" data-placeholder="— Select —" class="input">
+                                        <option value="">— Select —</option>
+                                    </select>
+                                    <p class="field-help">Standard delivery terms (Incoterms 2020).</p>
+                                </div>
+                                <div>
+                                    <label class="label">Country of Origin</label>
+                                    <input type="text" id="form-product-origin" class="input" placeholder="e.g. Brazil, Turkey">
+                                    <p class="field-help">Where the goods are produced/grown.</p>
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-5 pt-5 border-t border-slate-200">
+                                <div>
+                                    <label class="label">Offer Valid Until</label>
+                                    <input type="date" id="form-product-valid" class="input">
+                                    <p class="field-help">The date this price expires. Leave empty for open-ended.</p>
+                                </div>
+                                <div>
+                                    <label class="label">Payment Terms</label>
+                                    <input type="text" id="form-product-payterms" class="input" placeholder="e.g. 30% advance, 70% before shipment">
+                                    <p class="field-help">Standard payment schedule you accept.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="ptab-specs" class="ptab-pane hidden space-y-4">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="card p-5">
+                                <h4 class="text-sm font-semibold text-slate-800 mb-3">COA Parameters</h4>
+                                <div id="portal-coa-list" class="space-y-2 mb-3 max-h-40 overflow-y-auto custom-scrollbar"></div>
+                                <div class="flex gap-2">
+                                    <input id="p-coa-name" class="input text-xs" placeholder="Parameter (e.g. Purity)">
+                                    <input id="p-coa-value" class="input text-xs" placeholder="Value (e.g. 99.8%)">
+                                    <button type="button" class="btn btn-primary small text-xs" onclick="addPortalCOA()">Add</button>
+                                </div>
+                            </div>
+                            <div class="card p-5">
+                                <h4 class="text-sm font-semibold text-slate-800 mb-3">Container Logistics</h4>
+                                <div class="grid grid-cols-2 gap-3">
+                                    <div><label class="label">Cap. 1x20'ft (MT)</label><input type="number" id="form-product-cap20" class="input font-mono"></div>
+                                    <div><label class="label">Cap. 1x40'ft (MT)</label><input type="number" id="form-product-cap40" class="input font-mono"></div>
+                                </div>
+                                <label class="label mt-4">Certificates &amp; Lab Assays</label>
+                                <input type="file" id="form-product-certs" class="text-xs w-full" accept=".pdf,.jpg,.png" multiple>
+                                <div id="form-existing-certs" class="mt-2 space-y-1 text-xs text-blue-600"></div>
+                            </div>
+                            <div class="md:col-span-2 card p-5">
+                                <label class="label">Detailed Specification</label>
+                                <textarea id="form-product-spec" rows="4" class="input"></textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="ptab-packaging" class="ptab-pane hidden space-y-4">
+                        <div class="card p-5 grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div><label class="label">Packaging Type</label><input type="text" id="form-product-packaging" class="input" placeholder="e.g. 25kg PP Woven Bag"></div>
+                            <div><label class="label">Package Weight (kg)</label><input type="number" step="0.01" id="form-product-package-weight" class="input font-mono"></div>
+                            <div><label class="label">Units per Pallet</label><input type="number" id="form-product-per-pallet" class="input font-mono"></div>
+                            <div><label class="label">Available Stock</label><input type="number" step="0.01" id="form-product-stock" class="input font-mono"></div>
+                            <div><label class="label">Warehouse Location</label><input type="text" id="form-product-warehouse" class="input" placeholder="e.g. Jebel Ali, UAE"></div>
+                            <div><label class="label">Lead Time</label><input type="text" id="form-product-leadtime" class="input" placeholder="e.g. 15-20 days"></div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="bg-slate-50 p-4 border-t border-slate-200 flex justify-end gap-3">
+                <button type="button" class="btn btn-ghost" onclick="closeProductModal()" id="btn-prod-cancel">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveProductItem()" id="btn-prod-save">Submit for Approval</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- PDF PREVIEW MODAL -->
+    <div id="pdf-preview-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-5xl h-[92vh] flex flex-col overflow-hidden">
+            <div class="flex justify-between items-center border-b border-slate-100 px-6 py-4">
+                <div>
+                    <h3 class="text-lg font-semibold text-slate-900" id="pdf-preview-title">Document Preview</h3>
+                    <p class="text-xs text-slate-400 mt-0.5" id="pdf-preview-subtitle">Review the document before saving or printing a hard copy.</p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button type="button" class="btn btn-ghost" onclick="printPdfPreview()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4"><path d="M6 9V2h12v7"/><rect x="6" y="14" width="12" height="8"/><path d="M18 14h3v-4H3v4h3"/></svg>
+                        <span>Print</span>
+                    </button>
+                    <button type="button" class="btn btn-primary" onclick="downloadPdfPreview()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4"><path d="M12 3v14m-5-5l5 5 5-5M5 21h14"/></svg>
+                        <span>Download</span>
+                    </button>
+                    <button type="button" class="icon-btn" onclick="closePdfPreview()">✕</button>
+                </div>
+            </div>
+            <div class="flex-1 min-h-0 bg-slate-100">
+                <iframe id="pdf-preview-frame" class="w-full h-full" style="border:none;"></iframe>
+            </div>
+        </div>
+    </div>
+
+    <!-- FULL LOADING -->
+    <div id="full-loading" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 hidden items-center justify-center">
+        <div class="bg-white p-8 rounded-2xl shadow-2xl flex flex-col items-center gap-3 border border-slate-200">
+            <div class="animate-spin rounded-full h-9 w-9 border-b-2 border-blue-600"></div>
+            <p class="font-semibold text-slate-700 text-sm" id="lbl-uploading-docs">Encrypting &amp; uploading…</p>
+        </div>
+    </div>
+
+    <!-- SESSION WARNING -->
+    <div id="session-warning" class="hidden fixed bottom-4 left-1/2 -translate-x-1/2 z-50 bg-amber-50 border border-amber-300 rounded-xl shadow-lg px-5 py-3 flex items-center gap-3 text-sm text-amber-800 font-medium">
+        <span>Your session will expire soon due to inactivity.</span>
+        <button onclick="resetInactivityTimer()" class="bg-amber-600 text-white px-3 py-1 rounded-lg text-xs font-semibold hover:bg-amber-700">Stay signed in</button>
+    </div>
+
+    <!-- TOAST CONTAINER -->
+    <div id="toast-container"></div>
+
+    <script nonce="{{ g.csp_nonce }}">
+        const TOKEN = "{{ token }}";
+        let portalData = null;
+        let authKey = sessionStorage.getItem(`portal_auth_${TOKEN}`);
+        let otpRequested = false;
+        let uploadedCertUrls = [];
+        let activeCOAParams = [];
+    </script>
+    <datalist id="shared-countries-datalist"></datalist>
+    <script src="/static/js/config/shared_constants.js"></script>
+    <script src="/static/js/config/iso_countries.js"></script>
+    <script src="/static/js/config/hs_codes.js"></script>
+    <script src="/static/js/vendor/iban.js"></script>
+    <script src="/static/js/vendor/signature_pad.js"></script>
+    <script nonce="{{ g.csp_nonce }}">
+        // Populate country datalist and bind to all text inputs whose id contains 'country'.
+        (function() {
+            function bindCountries() {
+                const dl = document.getElementById('shared-countries-datalist');
+                if (dl && window.COUNTRIES && !dl.children.length) {
+                    dl.innerHTML = window.COUNTRIES.map(c => `<option value="${c}">`).join('');
+                }
+                document.querySelectorAll('input[type=text][id*="country" i]').forEach(inp => {
+                    if (!inp.getAttribute('list')) inp.setAttribute('list', 'shared-countries-datalist');
+                });
+            }
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', bindCountries);
+            } else {
+                bindCountries();
+            }
+        })();
+    </script>
+    <script src="/static/js/portal/i18n.js"></script>
+    <script src="/static/js/portal/ui.js"></script>
+    <script src="/static/js/portal/api.js"></script>
+    <script src="/static/js/portal/heartbeat.js"></script>
+    <script src="/static/js/modules/logistics/planner.js"></script>
+</body>
+</html>

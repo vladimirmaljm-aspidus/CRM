@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ doc_type|capitalize }} editor — Aspidus CRM</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body { font-family: Inter, ui-sans-serif, system-ui, sans-serif; background: linear-gradient(180deg,#f8fafc,#eef2f7); min-height:100vh; }
+  .card { background:white; border-radius:14px; border:1px solid #e5e7eb; }
+  .btn { padding:8px 14px; border-radius:10px; font-weight:600; font-size:13px; cursor:pointer; transition:.15s; display:inline-flex; align-items:center; gap:6px; }
+  .btn-primary { background:linear-gradient(135deg,#4f46e5,#7c3aed); color:white; }
+  .btn-success { background:linear-gradient(135deg,#059669,#10b981); color:white; }
+  .btn-ghost { background:white; color:#334155; border:1px solid #e5e7eb; }
+  .btn-danger { background:#fee2e2; color:#dc2626; }
+  input, select, textarea { padding:8px 12px; border:1px solid #e2e8f0; border-radius:8px; width:100%; font-size:13px; }
+  input:focus, select:focus, textarea:focus { outline:none; border-color:#4f46e5; box-shadow:0 0 0 3px rgba(79,70,229,.15); }
+  label { display:block; font-size:11px; font-weight:600; color:#475569; text-transform:uppercase; letter-spacing:.05em; margin-bottom:4px; }
+  .locked { background:#f8fafc; opacity:.85; pointer-events:none; }
+  .status-pill { display:inline-block; padding:3px 10px; border-radius:99px; font-size:11px; font-weight:700; text-transform:uppercase; }
+  .status-draft { background:#fef3c7; color:#92400e; }
+  .status-final { background:#d1fae5; color:#065f46; }
+</style>
+<script src="/static/js/core/breadcrumbs.js" defer></script>
+</head>
+<body class="p-4 md:p-6">
+<div class="max-w-5xl mx-auto">
+  <div id="breadcrumbs-mount" class="mb-3"></div>
+
+  <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
+    <div class="flex items-center gap-3">
+      <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white flex items-center justify-center text-xl shadow">📄</div>
+      <div>
+        <h1 class="text-xl font-bold text-slate-900" id="hdr-title">{{ doc_type|capitalize }} editor</h1>
+        <div class="text-xs text-slate-500 mt-0.5" id="hdr-sub">New draft — not yet saved.</div>
+      </div>
+    </div>
+    <div class="flex gap-2 flex-wrap">
+      <a href="/documents/register" class="btn btn-ghost">📚 Register</a>
+      <button id="btn-back" class="btn btn-ghost">← Back</button>
+      <button id="btn-draft" class="btn btn-primary">💾 Save draft</button>
+      <button id="btn-final" class="btn btn-success">✔ Save final (locks doc #)</button>
+      <!-- V23.1 #7 — convert button visible SAMO ako je ovo finalizovana ponuda -->
+      <div id="convert-actions" class="hidden flex gap-2">
+        <button id="btn-to-invoice" class="btn" style="background:#0ea5e9;color:white">→ Invoice</button>
+        <button id="btn-to-proforma" class="btn" style="background:#7c3aed;color:white">→ Proforma</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card p-5 mb-4">
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div>
+        <label>Document number</label>
+        <input id="f-docNumber" readonly placeholder="(auto on Save final)">
+      </div>
+      <div>
+        <label>Version</label>
+        <input id="f-versionLabel" readonly placeholder="V1">
+      </div>
+      <div>
+        <label>Status</label>
+        <div class="pt-2"><span id="f-status" class="status-pill status-draft">Draft</span></div>
+      </div>
+
+      <div class="relative">
+        <label>Partner (autocomplete)</label>
+        <input id="f-partnerSearch" placeholder="Type company name…" autocomplete="off">
+        <div id="partner-dropdown" class="hidden absolute z-10 left-0 right-0 bg-white border border-slate-200 rounded-lg shadow max-h-56 overflow-y-auto text-sm mt-1"></div>
+        <input id="f-partnerId" type="hidden">
+      </div>
+      <div>
+        <label>Partner Name (auto-filled)</label>
+        <input id="f-partnerName" placeholder="Client name" readonly class="bg-slate-50">
+      </div>
+      <div>
+        <label>Currency</label>
+        <select id="f-currency">
+          <option>EUR</option><option>USD</option><option>RSD</option><option>GBP</option><option>CHF</option>
+        </select>
+      </div>
+
+      <div>
+        <label>Issue date</label>
+        <input id="f-issueDate" type="date">
+      </div>
+      <div>
+        <label>Due date</label>
+        <input id="f-dueDate" type="date">
+      </div>
+      <div>
+        <label>Incoterm</label>
+        <select id="f-incoterm">
+          <option value="">—</option>
+          <option>EXW</option><option>FCA</option><option>FOB</option><option>CFR</option>
+          <option>CIF</option><option>CPT</option><option>CIP</option><option>DAP</option><option>DDP</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <div class="card p-5 mb-4">
+    <div class="flex items-center justify-between mb-3">
+      <b class="text-slate-900 text-sm uppercase tracking-widest">Line items</b>
+      <button class="btn btn-ghost" onclick="addLine()">+ Add line</button>
+    </div>
+    <table class="w-full">
+      <thead>
+        <tr class="text-[10px] uppercase tracking-widest text-slate-500 text-left">
+          <th class="pb-2">#</th><th class="pb-2">Product</th><th class="pb-2">Qty</th>
+          <th class="pb-2">Unit</th><th class="pb-2">Price</th><th class="pb-2 text-right">Total</th><th></th>
+        </tr>
+      </thead>
+      <tbody id="lines-tbody"></tbody>
+      <tfoot>
+        <tr class="border-t-2 border-slate-200">
+          <td colspan="5" class="pt-3 text-right font-semibold text-slate-700">GRAND TOTAL</td>
+          <td class="pt-3 text-right font-bold text-lg text-indigo-700" id="grand-total">0.00</td>
+          <td></td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+
+  <div class="card p-5 mb-4">
+    <label>Notes / terms</label>
+    <textarea id="f-notes" rows="4" placeholder="Payment terms, delivery, extra remarks…"></textarea>
+  </div>
+
+  <div id="revision-panel" class="card p-5 mb-4 hidden">
+    <label>Reason for this revision (required when re-finalizing an already-issued document)</label>
+    <input id="f-changeReason" placeholder="e.g. Fixed unit price on line 2 after client feedback">
+  </div>
+</div>
+
+<script nonce="{{ g.csp_nonce }}">
+const DOC_TYPE = {{ doc_type|tojson }};
+const DOC_ID = {{ doc_id|tojson }};
+let currentDoc = { items: [{}, {}] };
+let csrf = '';
+async function _csrf(){ if(csrf)return csrf; csrf=(await(await fetch('/api/csrf/token')).json()).csrf_token||''; return csrf; }
+function esc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));}
+
+async function boot() {
+  window.setBreadcrumbs([
+    { label: 'Documents' },
+    { label: 'Register', href: '/documents/register' },
+    { label: (DOC_ID ? 'Edit ' : 'New ') + DOC_TYPE.charAt(0).toUpperCase() + DOC_TYPE.slice(1) },
+  ]);
+
+  if (DOC_ID) {
+    const r = await fetch(`/api/documents/${DOC_TYPE}/${DOC_ID}`);
+    if (r.ok) currentDoc = (await r.json()).doc || currentDoc;
+  }
+  paint();
+}
+
+function paint() {
+  document.getElementById('f-docNumber').value = currentDoc.docNumber || '';
+  document.getElementById('f-versionLabel').value = currentDoc.versionLabel || 'V1';
+  const st = currentDoc.status || 'draft';
+  const stEl = document.getElementById('f-status');
+  stEl.textContent = st;
+  stEl.className = 'status-pill ' + (st === 'final' ? 'status-final' : 'status-draft');
+  document.getElementById('f-partnerId').value = currentDoc.partnerId || currentDoc.customerId || '';
+  document.getElementById('f-partnerName').value = currentDoc.partnerName || '';
+  document.getElementById('f-currency').value = currentDoc.currency || 'EUR';
+  document.getElementById('f-issueDate').value = (currentDoc.issueDate||'').substring(0,10);
+  document.getElementById('f-dueDate').value = (currentDoc.dueDate||'').substring(0,10);
+  document.getElementById('f-incoterm').value = currentDoc.incoterm || '';
+  document.getElementById('f-notes').value = currentDoc.notes || '';
+
+  // Revision panel visible if doc has been finalized before
+  if (currentDoc.docNumber && currentDoc.status === 'final') {
+    document.getElementById('revision-panel').classList.remove('hidden');
+    document.getElementById('hdr-sub').textContent = `Finalized as ${currentDoc.docNumber}. Editing creates a new version.`;
+  } else if (currentDoc.docNumber) {
+    document.getElementById('hdr-sub').textContent = `Draft of ${currentDoc.docNumber}.`;
+  }
+  paintLines();
+}
+
+function paintLines() {
+  const tbody = document.getElementById('lines-tbody');
+  const items = currentDoc.items || [];
+  if (items.length === 0) items.push({});
+  tbody.innerHTML = items.map((it, i) => `
+    <tr>
+      <td class="text-slate-400 text-xs pr-2">${i+1}</td>
+      <td class="pr-2 py-1"><input data-line="${i}" data-field="name" value="${esc(it.name||'')}" placeholder="Product name" style="min-width:200px"></td>
+      <td class="pr-2 py-1"><input data-line="${i}" data-field="qty" type="number" step="any" value="${esc(it.qty||'')}" style="width:80px"></td>
+      <td class="pr-2 py-1"><input data-line="${i}" data-field="unit" value="${esc(it.unit||'')}" placeholder="pcs" style="width:70px"></td>
+      <td class="pr-2 py-1"><input data-line="${i}" data-field="price" type="number" step="any" value="${esc(it.price||'')}" style="width:100px"></td>
+      <td class="text-right pr-2 py-1 font-semibold text-slate-700">${(Number(it.qty||0)*Number(it.price||0)).toFixed(2)}</td>
+      <td><button onclick="removeLine(${i})" class="text-red-500 hover:text-red-700 text-lg px-2">×</button></td>
+    </tr>
+  `).join('');
+  tbody.querySelectorAll('input[data-line]').forEach(inp => {
+    inp.addEventListener('input', () => {
+      const idx = +inp.dataset.line, f = inp.dataset.field;
+      currentDoc.items[idx] = currentDoc.items[idx] || {};
+      currentDoc.items[idx][f] = f==='qty'||f==='price' ? Number(inp.value||0) : inp.value;
+      paintLines();
+    });
+  });
+  const grand = items.reduce((s, it) => s + Number(it.qty||0)*Number(it.price||0), 0);
+  document.getElementById('grand-total').textContent = grand.toFixed(2) + ' ' + (currentDoc.currency||'EUR');
+}
+
+function addLine() { currentDoc.items = currentDoc.items || []; currentDoc.items.push({}); paintLines(); }
+function removeLine(i) { currentDoc.items.splice(i,1); paintLines(); }
+
+function collect() {
+  return Object.assign({}, currentDoc, {
+    partnerId:  document.getElementById('f-partnerId').value.trim(),
+    partnerName: document.getElementById('f-partnerName').value.trim(),
+    currency:   document.getElementById('f-currency').value,
+    issueDate:  document.getElementById('f-issueDate').value,
+    dueDate:    document.getElementById('f-dueDate').value,
+    incoterm:   document.getElementById('f-incoterm').value,
+    notes:      document.getElementById('f-notes').value,
+  });
+}
+
+async function save(final) {
+  const doc = collect();
+  const reason = document.getElementById('f-changeReason') ? document.getElementById('f-changeReason').value.trim() : '';
+  if (final && currentDoc.docNumber && currentDoc.status === 'final' && !reason) {
+    alert('Please describe why you are re-finalizing this document (creates a new revision).');
+    return;
+  }
+  const csrfTok = await _csrf();
+  const url = `/api/documents/${DOC_TYPE}/${DOC_ID || 'new'}`;
+  const r = await fetch(url, {
+    method:'POST', headers:{'Content-Type':'application/json','X-CSRF-Token':csrfTok},
+    body: JSON.stringify({ doc, finalize: !!final, change_reason: reason })
+  });
+  const j = await r.json();
+  if (!r.ok) { alert('Save failed: ' + (j.error||r.status)); return; }
+  if (!DOC_ID) {
+    location.href = `/documents/edit/${DOC_TYPE}/${j.id}`;
+    return;
+  }
+  currentDoc.docNumber = j.docNumber || currentDoc.docNumber;
+  currentDoc.versionLabel = j.versionLabel || currentDoc.versionLabel;
+  currentDoc.status = j.finalized ? 'final' : (currentDoc.status || 'draft');
+  paint();
+  alert(final ? `✔ Finalized as ${j.docNumber} (${j.versionLabel}).` : '✓ Draft saved.');
+}
+
+document.getElementById('btn-draft').addEventListener('click', () => save(false));
+document.getElementById('btn-final').addEventListener('click', () => {
+  if (!confirm('Save FINAL? A document number will be reserved. Further edits will create a new version.')) return;
+  save(true);
+});
+document.getElementById('btn-back').addEventListener('click', () => history.back());
+
+// V23.1 #7 — convert offer → invoice / proforma
+async function convert(target) {
+  if (!currentDoc.docNumber || currentDoc.status !== 'final') {
+    alert('Ponuda mora biti finalizovana (Save final) pre konverzije.');
+    return;
+  }
+  if (!confirm(`Konvertujem ovu ponudu (${currentDoc.docNumber}) u ${target === 'invoice' ? 'INVOICE' : 'PROFORMA'}?\n\nPodaci se prenose 1:1, izdaje se nov broj dokumenta.`)) return;
+  const csrfTok = await _csrf();
+  const r = await fetch('/api/documents/convert', {
+    method:'POST', headers:{'Content-Type':'application/json','X-CSRF-Token':csrfTok},
+    body: JSON.stringify({ source_type: 'offer', source_id: DOC_ID, target_type: target })
+  });
+  const j = await r.json();
+  if (r.ok) {
+    alert(`✔ Kreirano: ${j.docNumber}`);
+    location.href = j.redirect;
+  } else {
+    alert('✗ ' + (j.error || r.status));
+  }
+}
+document.getElementById('btn-to-invoice').addEventListener('click', () => convert('invoice'));
+document.getElementById('btn-to-proforma').addEventListener('click', () => convert('proforma'));
+
+// V23.1 — partner autocomplete
+let partnersCache = null;
+async function loadPartners() {
+  if (partnersCache) return partnersCache;
+  try {
+    const r = await fetch('/api/partners');
+    if (!r.ok) return partnersCache = [];
+    const j = await r.json();
+    partnersCache = (j.partners || j || []).filter(p => p && p.id);
+  } catch { partnersCache = []; }
+  return partnersCache;
+}
+async function wirePartnerAutocomplete() {
+  const inp = document.getElementById('f-partnerSearch');
+  const dd = document.getElementById('partner-dropdown');
+  const hidId = document.getElementById('f-partnerId');
+  const hidName = document.getElementById('f-partnerName');
+  // Pre-fill from currentDoc
+  if (currentDoc.partnerName) inp.value = currentDoc.partnerName;
+  inp.addEventListener('input', async () => {
+    const q = inp.value.trim().toLowerCase();
+    if (!q) { dd.classList.add('hidden'); return; }
+    const partners = await loadPartners();
+    const m = partners.filter(p => (p.name||'').toLowerCase().includes(q)).slice(0, 10);
+    if (!m.length) { dd.classList.add('hidden'); return; }
+    dd.innerHTML = m.map(p => `
+      <div data-pid="${esc(p.id)}" data-pname="${esc(p.name)}"
+           class="px-3 py-2 hover:bg-indigo-50 cursor-pointer border-b border-slate-100">
+        <b>${esc(p.name)}</b>
+        <span class="text-xs text-slate-500 ml-2">${esc(p.country||'')}</span>
+      </div>`).join('');
+    dd.classList.remove('hidden');
+    dd.querySelectorAll('[data-pid]').forEach(el => {
+      el.addEventListener('click', () => {
+        hidId.value = el.dataset.pid;
+        hidName.value = el.dataset.pname;
+        inp.value = el.dataset.pname;
+        currentDoc.partnerId = hidId.value;
+        currentDoc.partnerName = hidName.value;
+        dd.classList.add('hidden');
+      });
+    });
+  });
+  document.addEventListener('click', (e) => {
+    if (!dd.contains(e.target) && e.target !== inp) dd.classList.add('hidden');
+  });
+}
+
+// Nakon boot-a, show convert-actions ako je offer final
+const _origBoot = boot;
+boot = async function() {
+  await _origBoot();
+  wirePartnerAutocomplete();
+  if (DOC_TYPE === 'offer' && currentDoc.docNumber && currentDoc.status === 'final') {
+    document.getElementById('convert-actions').classList.remove('hidden');
+  }
+};
+
+boot();
+</script>
+</body>
+</html>

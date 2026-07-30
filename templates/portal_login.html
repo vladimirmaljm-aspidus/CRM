@@ -1,0 +1,767 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ company_name }} — Client Portal</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        :root {
+            --brand: {{ brand_color }};
+            --brand-2: #7c3aed;
+        }
+        html, body { height: 100%; }
+        body {
+            background: radial-gradient(ellipse at top left, rgba(79,70,229,.14), transparent 50%),
+                        radial-gradient(ellipse at bottom right, rgba(124,58,237,.10), transparent 50%),
+                        linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%);
+            font-family: 'Inter', 'SF Pro Display', ui-sans-serif, system-ui, -apple-system, sans-serif;
+            font-feature-settings: 'cv02','cv03','cv04','cv11','ss01','ss03';
+            min-height: 100vh;
+            -webkit-font-smoothing: antialiased;
+            letter-spacing: -0.011em;
+        }
+        /* Decorative blobs u pozadini — subtle */
+        body::before, body::after {
+            content: ''; position: fixed; border-radius: 50%; filter: blur(80px); pointer-events: none; z-index: 0;
+        }
+        body::before {
+            width: 500px; height: 500px; top: -100px; right: -100px;
+            background: radial-gradient(circle, rgba(79,70,229,.15), transparent 70%);
+        }
+        body::after {
+            width: 400px; height: 400px; bottom: -100px; left: -100px;
+            background: radial-gradient(circle, rgba(124,58,237,.12), transparent 70%);
+        }
+        .glass-card {
+            background: rgba(255,255,255,0.9);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255,255,255,0.9);
+            box-shadow:
+                0 20px 60px -12px rgba(15,23,42,0.15),
+                0 8px 20px -6px rgba(15,23,42,0.08),
+                0 1px 3px rgba(15,23,42,0.04);
+            position: relative;
+            z-index: 1;
+        }
+        .brand-gradient-btn {
+            background: linear-gradient(135deg, var(--brand) 0%, var(--brand-2) 100%);
+            color: white; font-weight: 600;
+            box-shadow: 0 4px 12px -2px rgba(79,70,229,0.35);
+            transition: all .18s cubic-bezier(.4,0,.2,1);
+        }
+        .brand-gradient-btn:hover:not(:disabled) {
+            transform: translateY(-1px);
+            box-shadow: 0 8px 20px -4px rgba(79,70,229,0.45);
+        }
+        .brand-gradient-btn:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
+        .brand-btn {
+            background: linear-gradient(135deg, var(--brand) 0%, var(--brand-2) 100%);
+            color: white; font-weight: 600;
+            box-shadow: 0 4px 12px -2px rgba(79,70,229,0.35);
+            transition: all .18s cubic-bezier(.4,0,.2,1);
+        }
+        .brand-btn:hover:not(:disabled) {
+            transform: translateY(-1px);
+            box-shadow: 0 8px 20px -4px rgba(79,70,229,0.45);
+        }
+        .brand-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+        .input-field {
+            width: 100%; padding: 12px 16px; background: #fff;
+            border: 1.5px solid #e2e8f0;
+            border-radius: 12px; font-size: 0.95rem;
+            transition: all 0.15s ease; color: #1e293b;
+        }
+        .input-field:focus {
+            outline: none; border-color: var(--brand);
+            box-shadow: 0 0 0 4px rgba(79,70,229,0.15);
+        }
+        .input-field::placeholder { color: #94a3b8; }
+        .label {
+            display: block; font-size: 11px; font-weight: 600;
+            color: #475569; letter-spacing: 0.05em;
+            text-transform: uppercase; margin-bottom: 6px;
+        }
+        .fade-in { animation: fadeIn 0.3s cubic-bezier(.4,0,.2,1); }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+        .brand-badge {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 4px 12px; border-radius: 999px;
+            background: linear-gradient(135deg, rgba(79,70,229,.1), rgba(124,58,237,.1));
+            border: 1px solid rgba(79,70,229,.2);
+            font-size: 11px; font-weight: 600; color: var(--brand);
+            letter-spacing: 0.03em;
+        }
+        .security-notice {
+            margin-top: 20px; padding: 12px 14px;
+            background: linear-gradient(135deg, rgba(16,185,129,.05), rgba(20,184,166,.05));
+            border: 1px solid rgba(16,185,129,.2);
+            border-radius: 10px;
+            font-size: 11px; color: #065f46;
+            display: flex; align-items: center; gap: 8px;
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center p-4">
+    <div class="w-full max-w-md">
+        <div class="text-center mb-8">
+            {% if company_logo %}
+            <img src="{{ company_logo }}" alt="{{ company_name }}" class="h-14 mx-auto mb-4" onerror="this.style.display='none'">
+            {% endif %}
+            <div class="mb-3"><span class="brand-badge">🔒 Secure Portal</span></div>
+            <h1 class="text-3xl font-bold text-slate-900 tracking-tight">{{ company_name }}</h1>
+            <p class="text-sm text-slate-500 mt-2 font-medium">B2B Client Portal · Sign in to access your account</p>
+        </div>
+
+        <div class="glass-card rounded-2xl p-8">
+            <!-- ================================================================
+                 SUPABASE AUTH BLOK — prikazuje se samo kada je server javio
+                 supabase_auth_enabled=true u /api/portal/public_config.
+                 Ako je flag off, blok ostaje hidden i legacy OTP UI preuzima.
+                 ================================================================ -->
+            <div id="step-supabase" class="hidden fade-in" data-supabase-ui>
+                <h2 class="text-lg font-semibold text-slate-900 mb-1">Sign in to your portal</h2>
+                <p class="text-sm text-slate-500 mb-6">Use your business email and password, or request a one-click magic link.</p>
+
+                <div class="flex gap-2 mb-5 p-1 bg-slate-100 rounded-xl text-sm font-medium">
+                    <button type="button" onclick="switchSupabaseTab('password')" id="sb-tab-password"
+                            class="flex-1 py-2 rounded-lg bg-white shadow-sm text-slate-900">Password</button>
+                    <button type="button" onclick="switchSupabaseTab('magic')" id="sb-tab-magic"
+                            class="flex-1 py-2 rounded-lg text-slate-500">Magic Link</button>
+                </div>
+
+                <!-- Password sub-tab -->
+                <div id="sb-pane-password" class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Email</label>
+                        <input type="email" id="sb-email" class="input-field" placeholder="your@company.com" autocomplete="username" required>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Password</label>
+                        <input type="password" id="sb-password" class="input-field" placeholder="••••••••" autocomplete="current-password" required>
+                    </div>
+                    <button onclick="supabaseSignIn()" id="sb-btn-signin"
+                            class="brand-btn w-full py-3 rounded-xl font-semibold text-white text-sm transition-all">
+                        Sign In
+                    </button>
+                    <div class="flex justify-between text-xs text-slate-500">
+                        <button type="button" onclick="supabaseSendReset()" id="sb-btn-forgot"
+                                class="hover:text-slate-700 transition-colors">Forgot password?</button>
+                        <span class="text-slate-300">·</span>
+                        <button type="button" onclick="showLegacyLogin()" class="hover:text-slate-700 transition-colors">Use verification code</button>
+                    </div>
+                </div>
+
+                <!-- Magic link sub-tab -->
+                <div id="sb-pane-magic" class="hidden space-y-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Email</label>
+                        <input type="email" id="sb-email-magic" class="input-field" placeholder="your@company.com" required>
+                    </div>
+                    <button onclick="supabaseSendMagicLink()" id="sb-btn-magic"
+                            class="brand-btn w-full py-3 rounded-xl font-semibold text-white text-sm transition-all">
+                        Send Magic Link
+                    </button>
+                    <p class="text-xs text-slate-500 leading-relaxed">
+                        We'll email you a secure link. Click it and you're in — no password needed.
+                        Link expires after 15 minutes.
+                    </p>
+                </div>
+
+                <p id="sb-error" class="text-sm text-red-600 mt-3 hidden"></p>
+                <p id="sb-info" class="text-sm text-emerald-600 mt-3 hidden"></p>
+            </div>
+
+            <!-- Step 1: Email (legacy OTP flow) -->
+            <div id="step-email" class="fade-in">
+                <h2 class="text-lg font-semibold text-slate-900 mb-1">Sign in to your portal</h2>
+                <p class="text-sm text-slate-500 mb-6">Enter your registered business email to receive a one-time verification code.</p>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Email Address</label>
+                        <input type="email" id="login-email" class="input-field" placeholder="your@company.com" required autofocus>
+                    </div>
+                    <button onclick="requestOTPByEmail()" id="btn-request-otp" class="brand-btn w-full py-3 rounded-xl font-semibold text-white text-sm transition-all">
+                        Send Verification Code
+                    </button>
+                </div>
+                <p id="email-error" class="text-sm text-red-600 mt-3 hidden"></p>
+                <p id="email-info" class="text-sm text-blue-600 mt-3 hidden"></p>
+            </div>
+
+            <!-- Step 2: OTP -->
+            <div id="step-otp" class="hidden fade-in">
+                <h2 class="text-lg font-semibold text-slate-900 mb-1">Enter verification code</h2>
+                <p class="text-sm text-slate-500 mb-6">A 6-digit code has been sent to <span id="sent-to-email" class="font-semibold text-slate-700"></span></p>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Verification Code</label>
+                        <!-- 6 pojedinačnih polja — profesionalan OTP unos.
+                             Podržava paste čitavog koda u bilo koje polje. Skriveni input
+                             #login-otp drži sastavljenu vrednost radi minimalnih izmena
+                             u verifyOTPLogin(). -->
+                        <div id="otp-boxes" class="flex justify-between gap-2" role="group" aria-label="One-time code">
+                            <input class="otp-box w-11 h-14 text-center text-2xl font-bold font-mono border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none" maxlength="1" inputmode="numeric" autocomplete="one-time-code" data-idx="0">
+                            <input class="otp-box w-11 h-14 text-center text-2xl font-bold font-mono border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none" maxlength="1" inputmode="numeric" data-idx="1">
+                            <input class="otp-box w-11 h-14 text-center text-2xl font-bold font-mono border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none" maxlength="1" inputmode="numeric" data-idx="2">
+                            <input class="otp-box w-11 h-14 text-center text-2xl font-bold font-mono border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none" maxlength="1" inputmode="numeric" data-idx="3">
+                            <input class="otp-box w-11 h-14 text-center text-2xl font-bold font-mono border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none" maxlength="1" inputmode="numeric" data-idx="4">
+                            <input class="otp-box w-11 h-14 text-center text-2xl font-bold font-mono border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none" maxlength="1" inputmode="numeric" data-idx="5">
+                        </div>
+                        <input type="hidden" id="login-otp">
+                        <p class="text-[11px] text-slate-500 mt-2">You can paste the whole 6-digit code — it will fill all boxes automatically.</p>
+                    </div>
+                    <button onclick="verifyOTPLogin()" id="btn-verify-otp" class="brand-btn w-full py-3 rounded-xl font-semibold text-white text-sm transition-all">
+                        Verify &amp; Sign In
+                    </button>
+                </div>
+                <p id="otp-error" class="text-sm text-red-600 mt-3 hidden"></p>
+                <div class="flex justify-between mt-4 text-xs text-slate-500">
+                    <button onclick="backToEmail()" class="hover:text-slate-700 transition-colors">&larr; Change email</button>
+                    <button onclick="resendOTP()" id="btn-resend" class="hover:text-slate-700 transition-colors">Resend code</button>
+                </div>
+            </div>
+
+            <!-- Loading -->
+            <div id="step-loading" class="hidden text-center py-8 fade-in">
+                <div class="animate-spin rounded-full h-8 w-8 border-b-2 mx-auto mb-3" style="border-color: var(--brand);"></div>
+                <p class="text-sm text-slate-500 font-medium">Signing you in&hellip;</p>
+            </div>
+
+            <!-- Set new password (posle klika na reset link ili invite) -->
+            <div id="step-set-password" class="hidden fade-in">
+                <h2 class="text-lg font-semibold text-slate-900 mb-1">Set your new password</h2>
+                <p class="text-sm text-slate-500 mb-6">Choose a strong password (min. 8 characters). You'll be signed in automatically.</p>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">New Password</label>
+                        <input type="password" id="sp-password" class="input-field" placeholder="••••••••" autocomplete="new-password" required>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Confirm Password</label>
+                        <input type="password" id="sp-password2" class="input-field" placeholder="••••••••" autocomplete="new-password" required>
+                    </div>
+                    <button onclick="setNewPassword()" id="sp-btn"
+                            class="brand-btn w-full py-3 rounded-xl font-semibold text-white text-sm transition-all">
+                        Save & Sign In
+                    </button>
+                </div>
+                <p id="sp-error" class="text-sm text-red-600 mt-3 hidden"></p>
+            </div>
+
+            <!-- Recovery link error (istekao/iskorišćen) -->
+            <div id="step-recovery-error" class="hidden fade-in">
+                <div class="rounded-xl bg-red-50 border border-red-200 p-4 mb-4">
+                    <h2 class="text-base font-semibold text-red-900 mb-1">Link expired or already used</h2>
+                    <p id="rec-error-msg" class="text-sm text-red-800">This password reset link is no longer valid.</p>
+                </div>
+                <button onclick="backToSupabaseLogin()"
+                        class="brand-btn w-full py-3 rounded-xl font-semibold text-white text-sm">
+                    Request a new link
+                </button>
+            </div>
+        </div>
+
+        <div class="mt-6 space-y-3 relative z-10">
+            <div class="flex items-center justify-center gap-4 text-xs text-slate-500">
+                <span class="flex items-center gap-1.5">
+                    <svg class="w-3.5 h-3.5 text-emerald-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3 6 6 .5-4.5 4 1.5 6.5L12 16l-6 3 1.5-6.5L3 8.5 9 8z"/></svg>
+                    End-to-end encrypted
+                </span>
+                <span class="text-slate-300">·</span>
+                <span class="flex items-center gap-1.5">
+                    <svg class="w-3.5 h-3.5 text-blue-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                    GDPR compliant
+                </span>
+                <span class="text-slate-300">·</span>
+                <span class="flex items-center gap-1.5">
+                    <svg class="w-3.5 h-3.5 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+                    Auto-timeout 15 min
+                </span>
+            </div>
+            <p class="text-center text-[11px] text-slate-400">Powered by {{ company_name }} · Need help? Contact your account manager.</p>
+        </div>
+    </div>
+
+    <script nonce="{{ g.csp_nonce }}">
+        // ================================================================
+        //  SUPABASE AUTH BOOTSTRAP — 100% SERVER-SIDE
+        //  Ne koristimo supabase-js CDN — svaki poziv ide preko naših
+        //  Flask endpoint-a. To znači da radi na PA Free bez ijedne
+        //  outbound CDN zavisnosti (bez CSP komplikacija, bez ES module
+        //  problema u strožim browser-ima).
+        // ================================================================
+        let sbConfig = null;
+
+        async function initSupabaseIfEnabled() {
+            // 100% server-side flow — nema supabase-js CDN dependency, radi
+            // svuda uključujući PA Free bez ikakvih outbound CDN pozivov.
+            const hash = window.location.hash || '';
+            const hasAuthHash = hash.includes('access_token=') || hash.includes('error=');
+            if (hasAuthHash) {
+                consumeUrlHashSession();  // recovery/magic UI se prikazuje odmah
+            }
+
+            try {
+                const res = await fetch('/api/portal/public_config');
+                const cfg = await res.json();
+                sbConfig = cfg;
+                if (!cfg.supabase_auth_enabled) return;
+
+                // Prikaži Supabase widget (Password/Magic Link) ako nismo u sred
+                // recovery flow-a. Sve tri operacije rade preko naših endpoint-a.
+                if (!hasAuthHash) {
+                    document.getElementById('step-supabase').classList.remove('hidden');
+                    document.getElementById('step-email').classList.add('hidden');
+                }
+            } catch (e) {
+                console.warn('Supabase init failed:', e);
+            }
+        }
+
+        // Session koji smo dobili preko recovery link-a. Čuvamo ga na window
+        // scope-u jer supabase-js internal state ga ne peristira sa persistSession=false.
+        let recoverySession = null;
+
+        async function consumeUrlHashSession() {
+            // Supabase magic-link i reset redirects sadrže:
+            //   #access_token=...&refresh_token=...&type=(recovery|magiclink|invite|signup)
+            // ILI (ako je Supabase odbio) #error=access_denied&error_code=otp_expired&error_description=...
+            const hash = window.location.hash || '';
+            if (!hash || hash === '#') return;
+
+            const params = new URLSearchParams(hash.replace(/^#/, ''));
+            const err = params.get('error');
+            const errCode = params.get('error_code');
+            const errDesc = params.get('error_description');
+
+            if (err) {
+                // Supabase je odbio verifikaciju (istekao token, već iskorišćen, itd.)
+                document.getElementById('step-supabase').classList.add('hidden');
+                document.getElementById('step-email').classList.add('hidden');
+                document.getElementById('step-recovery-error').classList.remove('hidden');
+                const msg = decodeURIComponent(errDesc || '').replace(/\+/g, ' ') || err;
+                document.getElementById('rec-error-msg').textContent =
+                    errCode === 'otp_expired'
+                        ? 'This password reset link has expired or was already used. Please request a new one.'
+                        : msg;
+                history.replaceState(null, '', window.location.pathname + window.location.search);
+                return;
+            }
+
+            const accessToken = params.get('access_token');
+            const refreshToken = params.get('refresh_token');
+            const linkType = params.get('type') || '';
+            if (!accessToken) return;
+
+            // Očisti hash odmah da token ne curi u browser history / referer
+            history.replaceState(null, '', window.location.pathname + window.location.search);
+
+            // Recovery / invite / signup → prvo tražimo NOVU LOZINKU.
+            // NE zahtevamo supabase-js — sve ide server-side kroz set-password endpoint.
+            if (linkType === 'recovery' || linkType === 'invite' || linkType === 'signup') {
+                recoverySession = { access_token: accessToken, refresh_token: refreshToken };
+                document.getElementById('step-supabase').classList.add('hidden');
+                document.getElementById('step-email').classList.add('hidden');
+                document.getElementById('step-set-password').classList.remove('hidden');
+                setTimeout(() => document.getElementById('sp-password').focus(), 50);
+                return;
+            }
+
+            // Magic-link (type=magiclink) — direct exchange
+            let locData = '';
+            try { locData = await getPreciseLocation(); } catch (_) {}
+            showSupabaseLoading();
+            try {
+                const res = await fetch('/api/portal/auth/supabase/exchange', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ access_token: accessToken, location: locData })
+                });
+                const data = await res.json();
+                if (res.ok && data.auth_key && data.token) {
+                    finishSupabaseLogin(data);
+                    return;
+                }
+                showSupabaseError(data.error === 'LOCATION_REQUIRED'
+                    ? 'Location access is required. Please allow precise location and try again.'
+                    : (data.error || 'Could not complete sign-in from magic link.'));
+            } catch (e) {
+                showSupabaseError('Network error while completing magic-link sign-in.');
+            }
+        }
+
+        window.setNewPassword = async function() {
+            const p1 = document.getElementById('sp-password').value;
+            const p2 = document.getElementById('sp-password2').value;
+            const errEl = document.getElementById('sp-error');
+            errEl.classList.add('hidden');
+            if (!p1 || p1.length < 8) { errEl.textContent = 'Password must be at least 8 characters.'; errEl.classList.remove('hidden'); return; }
+            if (p1 !== p2) { errEl.textContent = 'Passwords do not match.'; errEl.classList.remove('hidden'); return; }
+            if (!recoverySession || !recoverySession.access_token) {
+                errEl.textContent = 'Session expired. Please request a new reset link.';
+                errEl.classList.remove('hidden'); return;
+            }
+            const btn = document.getElementById('sp-btn');
+            btn.disabled = true; btn.textContent = 'Locating…';
+            // GPS pre-request (standard klijent mora, premium ne)
+            let locData = '';
+            try { locData = await getPreciseLocation(); } catch (_) {}
+            btn.textContent = 'Saving…';
+            try {
+                // Server-side set-password + login (ne zahteva supabase-js na klijentu)
+                const res = await fetch('/api/portal/auth/supabase/set-password', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        access_token: recoverySession.access_token,
+                        password: p1,
+                        location: locData,
+                    })
+                });
+                const body = await res.json();
+                if (res.ok && body.status === 'success' && body.auth_key && body.token) {
+                    finishSupabaseLogin(body);
+                    return;
+                }
+                if (body.error === 'LOCATION_REQUIRED') {
+                    errEl.textContent = body.message || 'Password saved. Please allow precise location and try again.';
+                } else {
+                    errEl.textContent = body.error || 'Could not save password.';
+                }
+                errEl.classList.remove('hidden');
+            } catch (e) {
+                errEl.textContent = 'Network error. Try again.';
+                errEl.classList.remove('hidden');
+            }
+            btn.disabled = false; btn.textContent = 'Save & Sign In';
+        };
+
+        window.backToSupabaseLogin = function() {
+            document.getElementById('step-recovery-error').classList.add('hidden');
+            document.getElementById('step-supabase').classList.remove('hidden');
+        };
+
+        window.switchSupabaseTab = function(tab) {
+            const pw = document.getElementById('sb-pane-password');
+            const ml = document.getElementById('sb-pane-magic');
+            const tp = document.getElementById('sb-tab-password');
+            const tm = document.getElementById('sb-tab-magic');
+            if (tab === 'magic') {
+                pw.classList.add('hidden'); ml.classList.remove('hidden');
+                tm.classList.add('bg-white', 'shadow-sm', 'text-slate-900');
+                tm.classList.remove('text-slate-500');
+                tp.classList.remove('bg-white', 'shadow-sm', 'text-slate-900');
+                tp.classList.add('text-slate-500');
+            } else {
+                ml.classList.add('hidden'); pw.classList.remove('hidden');
+                tp.classList.add('bg-white', 'shadow-sm', 'text-slate-900');
+                tp.classList.remove('text-slate-500');
+                tm.classList.remove('bg-white', 'shadow-sm', 'text-slate-900');
+                tm.classList.add('text-slate-500');
+            }
+            hideSupabaseFeedback();
+        };
+
+        window.supabaseSignIn = async function() {
+            const email = document.getElementById('sb-email').value.trim();
+            const password = document.getElementById('sb-password').value;
+            if (!email || !password) return showSupabaseError('Please enter email and password.');
+            const btn = document.getElementById('sb-btn-signin');
+            btn.disabled = true; btn.textContent = 'Locating…';
+            hideSupabaseFeedback();
+
+            let locData = '';
+            try { locData = await getPreciseLocation(); } catch (_) {}
+
+            btn.textContent = 'Signing in…';
+            try {
+                // Server-side sign in — NO supabase-js dependency, NO CDN required
+                const res = await fetch('/api/portal/auth/supabase/signin-password', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password, location: locData })
+                });
+                const body = await res.json();
+                if (res.ok && body.auth_key && body.token) {
+                    finishSupabaseLogin(body);
+                    return;
+                }
+                if (body.error === 'LOCATION_REQUIRED') {
+                    showSupabaseError(body.message || 'Location access is required.');
+                } else {
+                    showSupabaseError(body.error || 'Invalid email or password.');
+                }
+            } catch (e) {
+                showSupabaseError('Network error. Please try again.');
+            }
+            btn.disabled = false; btn.textContent = 'Sign In';
+        };
+
+        window.supabaseSendMagicLink = async function() {
+            const email = document.getElementById('sb-email-magic').value.trim();
+            if (!email || !email.includes('@')) return showSupabaseError('Please enter a valid email.');
+            const btn = document.getElementById('sb-btn-magic');
+            btn.disabled = true; btn.textContent = 'Sending…';
+            hideSupabaseFeedback();
+            try {
+                const res = await fetch('/api/portal/auth/supabase/send-magic-link', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email })
+                });
+                const body = await res.json();
+                if (res.ok) showSupabaseInfo(body.message || 'Check your email for a sign-in link.');
+                else showSupabaseError(body.error || 'Could not send magic link.');
+            } catch (e) {
+                showSupabaseError('Network error.');
+            }
+            setTimeout(() => { btn.disabled = false; btn.textContent = 'Send Magic Link'; }, 2500);
+        };
+
+        window.supabaseSendReset = async function() {
+            const email = document.getElementById('sb-email').value.trim();
+            if (!email || !email.includes('@')) return showSupabaseError('Enter your email in the field above first.');
+            const btn = document.getElementById('sb-btn-forgot');
+            btn.disabled = true;
+            hideSupabaseFeedback();
+            try {
+                const res = await fetch('/api/portal/auth/supabase/send-reset', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email })
+                });
+                const body = await res.json();
+                if (res.ok) showSupabaseInfo(body.message || 'If registered, a password-reset link has been sent.');
+                else showSupabaseError(body.error || 'Could not send reset link.');
+            } catch (e) {
+                showSupabaseError('Network error.');
+            }
+            setTimeout(() => { btn.disabled = false; }, 2500);
+        };
+
+        window.showLegacyLogin = function() {
+            document.getElementById('step-supabase').classList.add('hidden');
+            document.getElementById('step-email').classList.remove('hidden');
+        };
+
+        function finishSupabaseLogin(data) {
+            sessionStorage.setItem('portal_auth_' + data.token, data.auth_key);
+            if (data.isPremium) sessionStorage.setItem('portal_premium_' + data.token, '1');
+            document.getElementById('step-supabase').classList.add('hidden');
+            document.getElementById('step-loading').classList.remove('hidden');
+            window.location.href = '/portal/' + data.token;
+        }
+
+        function showSupabaseLoading() {
+            document.getElementById('step-supabase').classList.add('hidden');
+            document.getElementById('step-loading').classList.remove('hidden');
+        }
+        function showSupabaseError(msg) {
+            const e = document.getElementById('sb-error');
+            const i = document.getElementById('sb-info');
+            e.textContent = msg; e.classList.remove('hidden'); i.classList.add('hidden');
+        }
+        function showSupabaseInfo(msg) {
+            const e = document.getElementById('sb-error');
+            const i = document.getElementById('sb-info');
+            i.textContent = msg; i.classList.remove('hidden'); e.classList.add('hidden');
+        }
+        function hideSupabaseFeedback() {
+            document.getElementById('sb-error').classList.add('hidden');
+            document.getElementById('sb-info').classList.add('hidden');
+        }
+
+        // Pokreni na DOM ready — startuje Supabase widget ili ostavi legacy UI
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initSupabaseIfEnabled);
+        } else {
+            initSupabaseIfEnabled();
+        }
+    </script>
+
+    <script nonce="{{ g.csp_nonce }}">
+        let loginSessionId = null;
+        let loginEmail = '';
+
+        async function requestOTPByEmail() {
+            const email = document.getElementById('login-email').value.trim();
+            if (!email || !email.includes('@') || !email.includes('.')) {
+                return showError('email-error', 'Please enter a valid email address.');
+            }
+            loginEmail = email;
+            const btn = document.getElementById('btn-request-otp');
+            btn.disabled = true; btn.textContent = 'Sending…';
+            hideError('email-error'); hideError('email-info');
+            try {
+                const res = await fetch('/api/portal/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    loginSessionId = data.session_id;
+                    document.getElementById('sent-to-email').textContent = email;
+                    document.getElementById('step-email').classList.add('hidden');
+                    document.getElementById('step-otp').classList.remove('hidden');
+                    // Očisti stara polja pa fokus na prvo
+                    document.querySelectorAll('.otp-box').forEach(b => b.value = '');
+                    document.getElementById('login-otp').value = '';
+                    const firstBox = document.querySelector('.otp-box'); if (firstBox) firstBox.focus();
+                } else {
+                    showError('email-error', data.error || 'Something went wrong. Please try again.');
+                }
+            } catch (e) {
+                showError('email-error', 'Network error. Please check your connection.');
+            }
+            btn.disabled = false; btn.textContent = 'Send Verification Code';
+        }
+
+        // GPS je obavezan za portal login (isti standard kao CRM). Preciznu lokaciju
+        // zapisujemo u portal_activity_log i koristimo je za lokacijsku analitiku.
+        function getPreciseLocation() {
+            return new Promise((resolve, reject) => {
+                if (!navigator.geolocation) return reject('Your browser does not support GPS location.');
+                navigator.geolocation.getCurrentPosition(
+                    (pos) => resolve(`${pos.coords.latitude},${pos.coords.longitude}`),
+                    (err) => {
+                        if (err.code === err.PERMISSION_DENIED) reject('Location access denied. Please allow precise location in your browser and try again — it is required by our security policy.');
+                        else if (err.code === err.POSITION_UNAVAILABLE) reject('GPS signal unavailable. Please try again in a different location.');
+                        else if (err.code === err.TIMEOUT) reject('Location request timed out. Please try again.');
+                        else reject('Location error. Please try again.');
+                    },
+                    { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
+                );
+            });
+        }
+
+        async function verifyOTPLogin() {
+            const otp = document.getElementById('login-otp').value.trim();
+            if (!otp || otp.length !== 6) return showError('otp-error', 'Please enter the 6-digit code.');
+            const btn = document.getElementById('btn-verify-otp');
+            btn.disabled = true; btn.textContent = 'Locating…';
+            hideError('otp-error');
+            // Pokušavamo GPS, ali ne prekidamo login ako korisnik odbije —
+            // backend odlučuje: standardni klijenti dobijaju 403 LOCATION_REQUIRED,
+            // PREMIUM klijenti prolaze bez GPS-a. Ovo omogućava premium-only
+            // korisnicima da završe login čak i sa isključenom lokacijom.
+            let locData = '';
+            try {
+                locData = await getPreciseLocation();
+            } catch (gpsErr) {
+                // Ne prikazujemo grešku — puštamo backend da odluči.
+                // Ako je klijent standard, backend će vratiti LOCATION_REQUIRED
+                // i onda pokazujemo poruku.
+                console.info('GPS denied — backend će odlučiti da li je premium:', gpsErr);
+                locData = '';
+            }
+            btn.textContent = 'Verifying…';
+            try {
+                const res = await fetch('/api/portal/auth/login/verify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ session_id: loginSessionId, otp, location: locData })
+                });
+                const data = await res.json();
+                if (res.ok && data.auth_key && data.token) {
+                    sessionStorage.setItem('portal_auth_' + data.token, data.auth_key);
+                    if (data.isPremium) sessionStorage.setItem('portal_premium_' + data.token, '1');
+                    document.getElementById('step-otp').classList.add('hidden');
+                    document.getElementById('step-loading').classList.remove('hidden');
+                    window.location.href = '/portal/' + data.token;
+                } else {
+                    // 403 LOCATION_REQUIRED znači standard client bez GPS-a — jasna poruka
+                    if (data.error === 'LOCATION_REQUIRED') {
+                        showError('otp-error', 'Location access is required. Please allow precise location in your browser and try again.');
+                    } else {
+                        showError('otp-error', data.error || 'Invalid code. Please try again.');
+                    }
+                }
+            } catch (e) {
+                showError('otp-error', 'Network error. Please check your connection.');
+            }
+            btn.disabled = false; btn.textContent = 'Verify & Sign In';
+        }
+
+        function backToEmail() {
+            document.getElementById('step-otp').classList.add('hidden');
+            document.getElementById('step-email').classList.remove('hidden');
+            document.getElementById('login-email').focus();
+            loginSessionId = null;
+        }
+
+        async function resendOTP() {
+            if (!loginEmail) return;
+            const btn = document.getElementById('btn-resend');
+            btn.textContent = 'Sending…'; btn.disabled = true;
+            try {
+                const res = await fetch('/api/portal/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: loginEmail })
+                });
+                const data = await res.json();
+                if (res.ok) { loginSessionId = data.session_id; btn.textContent = 'Code sent!'; }
+                else { showError('otp-error', data.error || 'Could not resend code.'); btn.textContent = 'Resend code'; }
+            } catch (e) { btn.textContent = 'Resend code'; }
+            setTimeout(() => { btn.textContent = 'Resend code'; btn.disabled = false; }, 3000);
+        }
+
+        function showError(id, msg) { const el = document.getElementById(id); if (el) { el.textContent = msg; el.classList.remove('hidden'); } }
+        function hideError(id) { const el = document.getElementById(id); if (el) el.classList.add('hidden'); }
+
+        // OTP 6-polja: auto-focus + paste ceo kod. Skriveni #login-otp
+        // se ažurira na svaku promenu, tako da verifyOTPLogin() čita
+        // gotov 6-cifreni string.
+        const otpBoxes = Array.from(document.querySelectorAll('.otp-box'));
+        function syncHiddenOtp() {
+            document.getElementById('login-otp').value = otpBoxes.map(b => b.value).join('');
+        }
+        otpBoxes.forEach((box, idx) => {
+            box.addEventListener('input', (e) => {
+                // Ako je nalepljen ceo kod u jedno polje, rasporedi po ostalim
+                const v = e.target.value.replace(/\D/g, '');
+                if (v.length > 1) {
+                    for (let i = 0; i < 6; i++) {
+                        otpBoxes[i].value = v[i] || '';
+                    }
+                    syncHiddenOtp();
+                    const next = Math.min(v.length, 5);
+                    otpBoxes[next].focus();
+                    if (v.length === 6) setTimeout(verifyOTPLogin, 100);
+                    return;
+                }
+                e.target.value = v.slice(0, 1);
+                syncHiddenOtp();
+                if (v && idx < 5) otpBoxes[idx + 1].focus();
+                // Auto-submit kad se popuni poslednje polje
+                if (idx === 5 && v && otpBoxes.every(b => b.value)) {
+                    setTimeout(verifyOTPLogin, 100);
+                }
+            });
+            box.addEventListener('keydown', (e) => {
+                if (e.key === 'Backspace' && !box.value && idx > 0) {
+                    otpBoxes[idx - 1].focus();
+                    otpBoxes[idx - 1].value = '';
+                    syncHiddenOtp();
+                }
+                if (e.key === 'ArrowLeft' && idx > 0) otpBoxes[idx - 1].focus();
+                if (e.key === 'ArrowRight' && idx < 5) otpBoxes[idx + 1].focus();
+                if (e.key === 'Enter') verifyOTPLogin();
+            });
+            box.addEventListener('paste', (e) => {
+                e.preventDefault();
+                const pasted = (e.clipboardData || window.clipboardData).getData('text').replace(/\D/g, '').slice(0, 6);
+                for (let i = 0; i < 6; i++) otpBoxes[i].value = pasted[i] || '';
+                syncHiddenOtp();
+                otpBoxes[Math.min(pasted.length, 5)].focus();
+                if (pasted.length === 6) setTimeout(verifyOTPLogin, 100);
+            });
+        });
+
+        document.getElementById('login-email').addEventListener('keydown', e => { if (e.key === 'Enter') requestOTPByEmail(); });
+    </script>
+</body>
+</html>

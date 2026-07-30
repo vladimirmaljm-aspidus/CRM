@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Email Queue — Aspidus CRM</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: Inter, ui-sans-serif, system-ui, -apple-system, sans-serif; background: linear-gradient(180deg,#f8fafc,#eef2f7); min-height:100vh; }
+    .card { background:white; border-radius:14px; border:1px solid #e5e7eb; padding:18px 20px; }
+    .btn { padding:9px 16px; border-radius:10px; font-weight:600; font-size:13px; transition:.15s; display:inline-flex; align-items:center; gap:6px; }
+    .btn-ghost { background:white; color:#334155; border:1px solid #e5e7eb; }
+    .btn-ghost:hover { background:#f8fafc; }
+    .btn-primary { background:linear-gradient(135deg,#4f46e5,#7c3aed); color:white; }
+    .btn-warn { background:linear-gradient(135deg,#f59e0b,#d97706); color:white; }
+    .btn-danger { background:linear-gradient(135deg,#ef4444,#dc2626); color:white; }
+    .kpi { flex:1; padding:12px 16px; border-radius:12px; border:1px solid #e5e7eb; background:white; }
+    .kpi .val { font-size:24px; font-weight:800; letter-spacing:-.01em; }
+    .kpi .lbl { font-size:10px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:.06em; }
+    .badge { padding:2px 8px; border-radius:999px; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; }
+    .badge-pending { background:#dbeafe; color:#1e40af; }
+    .badge-sending { background:#fef3c7; color:#92400e; }
+    .badge-sent    { background:#dcfce7; color:#166534; }
+    .badge-failed  { background:#fee2e2; color:#991b1b; }
+    .badge-dead    { background:#334155; color:white; }
+    table { width:100%; border-collapse:collapse; }
+    th { text-align:left; font-size:10px; text-transform:uppercase; letter-spacing:.06em; color:#64748b; padding:8px 10px; border-bottom:1px solid #e5e7eb; }
+    td { padding:8px 10px; font-size:12px; border-bottom:1px solid #f1f5f9; vertical-align:top; }
+    tr:hover { background:#f8fafc; }
+    .toast { position:fixed; right:16px; top:16px; padding:10px 14px; border-radius:10px; background:#0f172a; color:white; font-size:13px; z-index:9999; box-shadow:0 8px 24px rgba(15,23,42,.35); animation:pop .2s ease; }
+    @keyframes pop { from { transform:translateY(-8px); opacity:0; } }
+  </style>
+</head>
+<body class="p-6 md:p-8">
+<div class="max-w-6xl mx-auto">
+  <div class="flex items-center justify-between mb-6">
+    <div class="flex items-center gap-3">
+      <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-amber-500 to-red-600 text-white flex items-center justify-center text-xl shadow">📮</div>
+      <div>
+        <h1 class="text-2xl font-bold text-slate-900">Email Queue</h1>
+        <p class="text-xs text-slate-500 mt-0.5">Pregled i kontrola svih mejlova koji su pokušali slanje. Auto-refresh svakih 20s.</p>
+      </div>
+    </div>
+    <div class="flex gap-2">
+      <button class="btn btn-ghost" onclick="refresh()">🔄 Refresh</button>
+      <button class="btn btn-primary" onclick="drainNow()">▶ Drain Queue Now</button>
+      <a href="/" class="btn btn-ghost">← CRM</a>
+    </div>
+  </div>
+
+  <div class="flex gap-3 mb-4 flex-wrap">
+    <div class="kpi"><div class="lbl">Pending</div><div class="val text-blue-700" id="k-pending">—</div></div>
+    <div class="kpi"><div class="lbl">Sending</div><div class="val text-amber-700" id="k-sending">—</div></div>
+    <div class="kpi"><div class="lbl">Sent</div><div class="val text-emerald-700" id="k-sent">—</div></div>
+    <div class="kpi"><div class="lbl">Failed</div><div class="val text-rose-700" id="k-failed">—</div></div>
+    <div class="kpi"><div class="lbl">Dead</div><div class="val text-slate-800" id="k-dead">—</div></div>
+  </div>
+
+  <div class="card mb-4">
+    <div class="flex flex-wrap items-center gap-3 mb-3">
+      <div class="flex gap-1 flex-wrap">
+        <button data-filter="" class="filter-btn btn btn-ghost">All</button>
+        <button data-filter="pending" class="filter-btn btn btn-ghost">Pending</button>
+        <button data-filter="failed"  class="filter-btn btn btn-ghost">Failed</button>
+        <button data-filter="dead"    class="filter-btn btn btn-ghost">Dead</button>
+        <button data-filter="sent"    class="filter-btn btn btn-ghost">Sent</button>
+      </div>
+      <div class="flex-1"></div>
+      <button class="btn btn-warn" onclick="retryAllFailed()" title="Reset status na pending za sve failed + dead">↻ Retry all failed / dead</button>
+      <button class="btn btn-danger" onclick="purgeSent()"    title="Obriši sve mejlove sa status='sent'">🗑 Purge sent</button>
+      <button class="btn btn-danger" onclick="purgeDead()"    title="Obriši sve mejlove sa status='dead'">💀 Purge dead</button>
+    </div>
+    <div class="flex items-center gap-3 mb-2">
+      <label class="text-xs text-slate-600 flex items-center gap-2"><input type="checkbox" id="select-all"> Select all visible</label>
+      <span class="text-xs text-slate-400" id="sel-count">0 selected</span>
+      <div class="flex-1"></div>
+      <button class="btn btn-warn small" onclick="retrySelected()">↻ Retry selected</button>
+      <button class="btn btn-danger small" onclick="deleteSelected()">🗑 Delete selected</button>
+    </div>
+    <div class="overflow-x-auto">
+      <table id="queue-table">
+        <thead>
+          <tr>
+            <th style="width:32px;"></th>
+            <th>Recipient</th>
+            <th>Subject</th>
+            <th>Status</th>
+            <th>Attempts</th>
+            <th>Queued</th>
+            <th>Last error</th>
+          </tr>
+        </thead>
+        <tbody id="queue-body"><tr><td colspan="7" class="text-center text-slate-400 py-8">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script nonce="{{ g.csp_nonce }}">
+let currentFilter = '';
+let csrf = '';
+
+async function loadCsrf() {
+  try { const r = await fetch('/api/csrf/token'); const j = await r.json(); csrf = j.csrf_token || ''; } catch(_) {}
+}
+
+function toast(msg, kind) {
+  const bg = { 'success': '#10b981', 'error': '#ef4444', 'info': '#0f172a', 'warn': '#f59e0b' }[kind] || '#0f172a';
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.style.background = bg;
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3200);
+}
+
+async function refresh() {
+  const url = '/api/admin/mail-queue' + (currentFilter ? `?status=${currentFilter}` : '');
+  try {
+    const r = await fetch(url);
+    const j = await r.json();
+    if (!j.ok) { document.getElementById('queue-body').innerHTML = `<tr><td colspan="7" class="text-red-600 text-center py-4">${j.error || 'error'}</td></tr>`; return; }
+    // KPIs
+    const s = j.summary || {};
+    document.getElementById('k-pending').textContent = s.pending || 0;
+    document.getElementById('k-sending').textContent = s.sending || 0;
+    document.getElementById('k-sent').textContent = s.sent || 0;
+    document.getElementById('k-failed').textContent = s.failed || 0;
+    document.getElementById('k-dead').textContent = s.dead || 0;
+    // Table
+    const rows = (j.emails || []).map(e => {
+      const dt = e.queued_at ? new Date(e.queued_at).toLocaleString() : '—';
+      return `<tr>
+        <td><input type="checkbox" class="row-sel" data-id="${e.id}"></td>
+        <td class="font-mono text-xs">${escapeHtml(e.recipient)}</td>
+        <td class="truncate max-w-[240px]">${escapeHtml(e.subject) || '<span class="text-slate-400">(no subject)</span>'}</td>
+        <td><span class="badge badge-${e.status}">${e.status}</span></td>
+        <td class="text-center">${e.attempts}</td>
+        <td class="text-slate-500 whitespace-nowrap">${escapeHtml(dt)}</td>
+        <td class="text-rose-600 font-mono text-[10px] truncate max-w-[280px]" title="${escapeHtml(e.last_error)}">${escapeHtml((e.last_error || '').substring(0, 100))}</td>
+      </tr>`;
+    }).join('') || '<tr><td colspan="7" class="text-center text-slate-400 py-8">No emails in queue.</td></tr>';
+    document.getElementById('queue-body').innerHTML = rows;
+    // Wire up selection
+    document.querySelectorAll('.row-sel').forEach(cb => cb.addEventListener('change', updateSelCount));
+    updateSelCount();
+  } catch (e) {
+    document.getElementById('queue-body').innerHTML = `<tr><td colspan="7" class="text-red-600 text-center py-4">Network error: ${escapeHtml(e.message)}</td></tr>`;
+  }
+}
+
+function updateSelCount() {
+  const n = document.querySelectorAll('.row-sel:checked').length;
+  document.getElementById('sel-count').textContent = n + ' selected';
+}
+
+function getSelected() {
+  return Array.from(document.querySelectorAll('.row-sel:checked')).map(x => x.dataset.id);
+}
+
+async function retryAllFailed() {
+  if (!confirm('Retry ALL failed and dead emails?')) return;
+  try {
+    const r = await fetch('/api/admin/mail-queue/retry', {
+      method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRF-Token': csrf},
+      body: JSON.stringify({ retry_all_failed: true })
+    });
+    const j = await r.json();
+    if (r.ok) { toast(`↻ Retried ${j.retried} email(s).`, 'success'); refresh(); }
+    else toast('Error: ' + (j.error || r.status), 'error');
+  } catch (e) { toast('Network error', 'error'); }
+}
+
+async function retrySelected() {
+  const ids = getSelected();
+  if (!ids.length) { toast('Nothing selected.', 'warn'); return; }
+  try {
+    const r = await fetch('/api/admin/mail-queue/retry', {
+      method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRF-Token': csrf},
+      body: JSON.stringify({ ids })
+    });
+    const j = await r.json();
+    if (r.ok) { toast(`↻ Retried ${j.retried} email(s).`, 'success'); refresh(); }
+    else toast('Error: ' + (j.error || r.status), 'error');
+  } catch (e) { toast('Network error', 'error'); }
+}
+
+async function deleteSelected() {
+  const ids = getSelected();
+  if (!ids.length) { toast('Nothing selected.', 'warn'); return; }
+  if (!confirm(`Delete ${ids.length} email(s) permanently?`)) return;
+  try {
+    const r = await fetch('/api/admin/mail-queue/delete', {
+      method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRF-Token': csrf},
+      body: JSON.stringify({ ids })
+    });
+    const j = await r.json();
+    if (r.ok) { toast(`🗑 Deleted ${j.deleted} email(s).`, 'success'); refresh(); }
+    else toast('Error: ' + (j.error || r.status), 'error');
+  } catch (e) { toast('Network error', 'error'); }
+}
+
+async function purgeSent() {
+  if (!confirm('Delete ALL emails with status="sent"?')) return;
+  const r = await fetch('/api/admin/mail-queue/delete', {
+    method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRF-Token': csrf},
+    body: JSON.stringify({ purge_status: 'sent' })
+  });
+  const j = await r.json();
+  if (r.ok) { toast(`🗑 Purged ${j.deleted} sent email(s).`, 'success'); refresh(); }
+  else toast('Error: ' + (j.error || r.status), 'error');
+}
+
+async function purgeDead() {
+  if (!confirm('Delete ALL emails with status="dead" (unrecoverable failures)?')) return;
+  const r = await fetch('/api/admin/mail-queue/delete', {
+    method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRF-Token': csrf},
+    body: JSON.stringify({ purge_status: 'dead' })
+  });
+  const j = await r.json();
+  if (r.ok) { toast(`💀 Purged ${j.deleted} dead email(s).`, 'success'); refresh(); }
+  else toast('Error: ' + (j.error || r.status), 'error');
+}
+
+async function drainNow() {
+  try {
+    const r = await fetch('/api/admin/mail-queue/drain', {
+      method: 'POST', headers: {'X-CSRF-Token': csrf}
+    });
+    const j = await r.json();
+    if (r.ok) { toast('▶ Drain complete: ' + JSON.stringify(j.stats), 'success'); refresh(); }
+    else toast('Error: ' + (j.error || r.status), 'error');
+  } catch (e) { toast('Network error', 'error'); }
+}
+
+function escapeHtml(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+
+// Filter buttons
+document.querySelectorAll('.filter-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.filter-btn').forEach(x => x.classList.remove('btn-primary'));
+    document.querySelectorAll('.filter-btn').forEach(x => x.classList.add('btn-ghost'));
+    btn.classList.remove('btn-ghost');
+    btn.classList.add('btn-primary');
+    currentFilter = btn.dataset.filter;
+    refresh();
+  });
+});
+
+// Select all
+document.getElementById('select-all').addEventListener('change', (e) => {
+  document.querySelectorAll('.row-sel').forEach(cb => cb.checked = e.target.checked);
+  updateSelCount();
+});
+
+(async () => {
+  await loadCsrf();
+  refresh();
+  setInterval(refresh, 20000);
+})();
+</script>
+</body>
+</html>

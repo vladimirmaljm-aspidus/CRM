@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Document Register — Aspidus CRM</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body { font-family: Inter, ui-sans-serif, system-ui, sans-serif; background: linear-gradient(180deg,#f8fafc,#eef2f7); min-height:100vh; }
+  .card { background:white; border-radius:14px; border:1px solid #e5e7eb; }
+  .btn { padding:6px 12px; border-radius:8px; font-weight:600; font-size:12px; cursor:pointer; }
+  .btn-primary { background:linear-gradient(135deg,#4f46e5,#7c3aed); color:white; }
+  .btn-ghost { background:white; color:#334155; border:1px solid #e5e7eb; }
+  .chip { padding:4px 10px; border-radius:99px; font-size:11px; font-weight:700; cursor:pointer; border:1px solid #e5e7eb; background:white; color:#475569; }
+  .chip.active { background:linear-gradient(135deg,#4f46e5,#7c3aed); color:white; border-color:transparent; }
+  input, select { padding:8px 12px; border:1px solid #e2e8f0; border-radius:8px; font-size:13px; }
+  input:focus, select:focus { outline:none; border-color:#4f46e5; box-shadow:0 0 0 3px rgba(79,70,229,.15); }
+  table { width:100%; border-collapse:collapse; }
+  th { background:#f1f5f9; text-align:left; padding:10px 14px; font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:#475569; }
+  td { padding:10px 14px; border-bottom:1px solid #e5e7eb; font-size:13px; }
+  tr:hover td { background:#f8fafc; }
+  .version-badge { display:inline-block; padding:2px 8px; border-radius:6px; font-size:10px; font-weight:700; background:#dbeafe; color:#1e40af; }
+</style>
+</head>
+<body class="p-6 md:p-8">
+<div class="max-w-7xl mx-auto">
+  <div class="flex items-center justify-between mb-6">
+    <div class="flex items-center gap-3">
+      <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white flex items-center justify-center text-xl shadow">📚</div>
+      <div>
+        <h1 class="text-2xl font-bold text-slate-900">Knjiga izdatih dokumenata</h1>
+        <p class="text-xs text-slate-500 mt-0.5">Svi redni brojevi ponuda, invoica i proforma sa istorijom verzija.</p>
+      </div>
+    </div>
+    <a href="/" class="btn btn-ghost">← CRM</a>
+  </div>
+
+  <div class="card p-4 mb-4">
+    <div class="flex flex-wrap items-center gap-2">
+      <div class="flex gap-1">
+        <button class="chip active" data-type="">All types</button>
+        <button class="chip" data-type="OFFER">Offers</button>
+        <button class="chip" data-type="INVOICE">Invoices</button>
+        <button class="chip" data-type="PROFORMA">Proforma</button>
+      </div>
+      <div class="flex-1"></div>
+      <input id="q" placeholder="Search doc number…" class="w-48">
+      <input id="year" type="number" placeholder="Year" class="w-24" value="">
+      <button class="btn btn-primary" onclick="load()">Filter</button>
+    </div>
+  </div>
+
+  <div class="card p-0 overflow-hidden">
+    <div class="overflow-x-auto">
+      <table>
+        <thead><tr>
+          <th>Doc #</th><th>Type</th><th>Version</th><th>Client</th><th>Issued</th><th>By</th><th>Status</th><th class="text-right pr-4">Action</th>
+        </tr></thead>
+        <tbody id="tbody"><tr><td colspan="8" class="text-center py-12 text-slate-400 text-sm">⏳ Loading…</td></tr></tbody>
+      </table>
+    </div>
+    <div id="footer-meta" class="p-3 text-xs text-slate-500 border-t"></div>
+  </div>
+</div>
+
+<script nonce="{{ g.csp_nonce }}">
+let activeType='';
+function esc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));}
+
+document.querySelectorAll('.chip[data-type]').forEach(c => {
+  c.addEventListener('click', () => {
+    document.querySelectorAll('.chip[data-type]').forEach(x => x.classList.remove('active'));
+    c.classList.add('active');
+    activeType = c.dataset.type;
+    load();
+  });
+});
+
+async function load() {
+  const q = document.getElementById('q').value.trim();
+  const year = document.getElementById('year').value.trim();
+  const params = new URLSearchParams();
+  if (activeType) params.set('type', activeType);
+  if (q) params.set('q', q);
+  if (year) params.set('year', year);
+  const r = await fetch('/api/documents/register?' + params);
+  const j = await r.json();
+  const items = j.items || [];
+  const tbody = document.getElementById('tbody');
+  if (!items.length) {
+    tbody.innerHTML = '<tr><td colspan="8" class="text-center py-12 text-slate-400 italic text-sm">No documents.</td></tr>';
+    document.getElementById('footer-meta').textContent = '0 documents.';
+    return;
+  }
+  tbody.innerHTML = items.map(d => `
+    <tr>
+      <td><code class="text-xs bg-slate-100 px-2 py-1 rounded">${esc(d.docNumber)}</code></td>
+      <td><b class="text-xs uppercase text-slate-600">${esc(d.docType)}</b></td>
+      <td><span class="version-badge">${esc(d.version_label)}</span></td>
+      <td class="truncate max-w-xs">${esc(d.partner_name)}</td>
+      <td class="text-slate-500 text-xs">${esc((d.issuedAt||'').substring(0,19).replace('T',' '))}</td>
+      <td class="text-slate-500 text-xs">${esc(d.issuedBy||'—')}</td>
+      <td><span class="text-xs px-2 py-0.5 rounded ${d.status==='active'?'bg-emerald-50 text-emerald-700':'bg-slate-100 text-slate-600'}">${esc(d.status)}</span></td>
+      <td class="text-right pr-4">
+        <a href="${esc(d.link)}" class="text-indigo-600 hover:underline text-xs font-semibold">Open →</a>
+        ${(d.revision||0) > 0 ? `<button onclick="showRevs('${esc(d.docNumber)}')" class="ml-2 text-xs text-slate-500 hover:text-indigo-600">History</button>` : ''}
+      </td>
+    </tr>
+  `).join('');
+  document.getElementById('footer-meta').textContent = `${items.length} documents shown.`;
+}
+
+async function showRevs(docNum) {
+  const j = await (await fetch(`/api/documents/register/${encodeURIComponent(docNum)}/revisions`)).json();
+  const revs = j.revisions || [];
+  const html = revs.length === 0 ? 'No revisions.' :
+    '<ol class="list-decimal list-inside text-xs space-y-1">' +
+    revs.map(r => `<li><b>V${(r.revision||0)+1}</b> — ${esc((r.changedAt||'').substring(0,19).replace('T',' '))} by ${esc(r.changedBy||'?')} — <i>${esc(r.changeReason||'')}</i></li>`).join('') +
+    '</ol>';
+  alert(`Revision history for ${docNum}:\n\n` + revs.map(r => `V${(r.revision||0)+1}: ${(r.changedAt||'').substring(0,19)} by ${r.changedBy||'?'} — ${r.changeReason||''}`).join('\n'));
+}
+
+load();
+</script>
+</body>
+</html>

@@ -1,0 +1,1114 @@
+:root {
+  /* =========================================
+     ASPIDUS — RAFINIRANI ENTERPRISE DIZAJN-SISTEM
+     ========================================= */
+  --bg: #f4f6f9;            /* mekana neutralna pozadina */
+  --panel: #ffffff;
+  --card: #ffffff;
+  --text-color: #101828;   /* meko crna, bolji kontrast bez tvrdoće */
+  --muted: #667085;        /* uravnotežena siva za sekundarni tekst */
+  --border: #e7eaef;       /* suptilne linije */
+  --border-strong: #d5dae1;
+  --hover-bg: #f2f5f9;
+
+  /* Primarna boja (zadržan plavi identitet, ali dublji/mirniji ton) */
+  --accent: #2563eb;
+  --accent-hover: #1d4ed8;
+  --accent-soft: #eef4ff;
+  --accent-ring: rgba(37, 99, 235, 0.18);
+
+  /* Statusne boje */
+  --success: #059669;
+  --danger: #dc2626;
+  --warning: #d97706;
+
+  /* Radijusi */
+  --radius-sm: 8px;
+  --radius: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 22px;
+
+  /* Slojeviti, mekani shadow sistem */
+  --shadow-xs: 0 1px 2px rgba(16,24,40,0.05);
+  --shadow-sm: 0 1px 2px rgba(16,24,40,0.04), 0 1px 3px rgba(16,24,40,0.06);
+  --shadow-md: 0 2px 6px rgba(16,24,40,0.05), 0 6px 16px rgba(16,24,40,0.06);
+  --shadow-lg: 0 10px 28px rgba(16,24,40,0.08), 0 3px 10px rgba(16,24,40,0.04);
+}
+
+* { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+
+html { font-size: 15px; }
+
+body {
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+  background-color: var(--bg);
+  color: var(--text-color);
+  color-scheme: light;
+  line-height: 1.5;
+  letter-spacing: -0.006em;
+  font-feature-settings: "cv02","cv03","cv04","cv11";
+}
+
+/* =========================================
+   TIPOGRAFSKO SMIRIVANJE (manje "vikanja")
+   Globalno ublažava prenaglašene težine i razmake
+   koji su hardkodirani po modulima.
+   ========================================= */
+.font-black { font-weight: 800 !important; }
+.tracking-widest { letter-spacing: 0.08em !important; }
+.tracking-\[0\.4em\] { letter-spacing: 0.24em !important; }
+
+/* Mekši, konzistentniji shadow preko celog UI-a */
+.shadow-2xl { box-shadow: var(--shadow-lg) !important; }
+.shadow-xl  { box-shadow: var(--shadow-lg) !important; }
+.shadow-lg  { box-shadow: var(--shadow-md) !important; }
+.shadow-md  { box-shadow: var(--shadow-sm) !important; }
+
+/* Profesionalna zaglavlja stranica (koristi createViewHeader) */
+.page-title { font-size: 1.6rem; font-weight: 700; letter-spacing: -0.02em; color: var(--text-color); }
+.page-subtitle { color: var(--muted); font-size: 0.9rem; font-weight: 500; margin-top: 0.15rem; }
+.section-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); }
+
+/* =========================================
+   SIGURNOSNE KLASE ZA BAZNE BOJE I KONTRAST
+   Garantuje vidljivost nezavisno od Tailwind CDN-a
+   ========================================= */
+.bg-accent { background-color: #2563eb !important; color: #ffffff !important; }
+.bg-success { background-color: #16a34a !important; color: #ffffff !important; }
+.bg-danger { background-color: #dc2626 !important; color: #ffffff !important; }
+.bg-warning { background-color: #eab308 !important; color: #000000 !important; }
+
+/* =========================================
+   PAMETNE KOREKCIJE ZA PRETHODNE JS TAILWIND KLASE
+   Svi elementi koji su u JS hardkodirani sa tamnim 
+   bojama, biće ovde prerađeni u svetlu paletu visokog kontrasta!
+   ========================================= */
+.bg-gray-800, .bg-gray-900, .bg-gray-800\/50, .bg-gray-900\/50 {
+    background-color: #f1f5f9 !important;
+    border-color: #e2e8f0 !important;
+    color: #0f172a !important;
+}
+
+.bg-gray-700 {
+    background-color: #e2e8f0 !important;
+    color: #0f172a !important;
+    border-color: #cbd5e1 !important;
+}
+
+.border-gray-600, .border-gray-700, .border-gray-700\/50 {
+    border-color: #cbd5e1 !important;
+}
+
+.divide-gray-700 > :not([hidden]) ~ :not([hidden]) {
+    border-color: #e2e8f0 !important;
+}
+
+.text-gray-300, .text-gray-400 {
+    color: #475569 !important;
+}
+
+.text-blue-300, .text-blue-400 {
+    color: #2563eb !important;
+}
+
+.bg-blue-900\/20 {
+    background-color: #dbeafe !important;
+    border-color: #bfdbfe !important;
+    color: #1e3a8a !important;
+}
+
+/* =========================================
+   KOREKCIJE KONTRASTA NA DUGMIĆIMA
+   ========================================= */
+button[class*="bg-teal-"], button[class*="bg-sky-"], button[class*="bg-gray-600"], 
+button[class*="bg-blue-500"], button[class*="bg-blue-600"], button[class*="bg-yellow-600"], 
+button[class*="bg-orange-500"], button[class*="bg-green-600"], button[class*="bg-red-600"], 
+button[class*="bg-purple-600"], button[class*="bg-accent"], button[class*="bg-success"], button[class*="bg-danger"] {
+    color: #ffffff !important;
+    border: none !important;
+}
+
+button[class*="bg-yellow-500"], button[class*="bg-warning"] {
+    color: #000000 !important;
+}
+
+/* Dinamičke klase */
+.bg-panel { background-color: var(--panel); }
+.bg-card { background-color: var(--card); }
+.border-theme { border-color: var(--border); }
+.text-main { color: var(--text-color); }
+.text-muted { color: var(--muted); }
+.text-accent { color: var(--accent); }
+
+/* Pametne boje za notifikacije / statuse */
+.text-danger { color: #dc2626; } 
+.text-success { color: #16a34a; } 
+.text-warning { color: #d97706; } 
+
+.bg-danger-light { background-color: #fee2e2; border-color: #fca5a5; }
+.bg-success-light { background-color: #dcfce7; border-color: #86efac; }
+
+/* =========================================
+   FORME, INPUTI I DUGMIĆI
+   ========================================= */
+.form-input {
+    width: 100%; padding: 10px 13px; background: var(--panel); border-radius: var(--radius-sm);
+    color: var(--text-color) !important; border: 1px solid var(--border-strong); transition: box-shadow 0.15s ease, border-color 0.15s ease;
+    font-size: 0.9rem;
+}
+.form-input:focus { outline: none; box-shadow: 0 0 0 3px var(--accent-ring); border-color: var(--accent); }
+.form-input:hover:not(:focus) { border-color: #c3cad4; }
+.form-input::placeholder { color: var(--muted); opacity: 0.7; }
+label { letter-spacing: -0.005em; }
+
+.btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    padding: 9px 15px; border-radius: var(--radius-sm); font-weight: 600; font-size: 0.9rem; cursor: pointer; user-select: none;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease, filter 0.15s ease; border: 1px solid transparent;
+}
+.btn:hover { transform: translateY(-1px); box-shadow: var(--shadow-sm); filter: brightness(1.03); }
+.btn:active { transform: translateY(0); box-shadow: none; filter: brightness(0.98); }
+.small { padding: 6px 11px; font-size: 0.82rem; border-radius: var(--radius-sm); }
+
+/* Semantičke varijante dugmadi (za nove/refaktorisane ekrane) */
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-primary:hover { background: var(--accent-hover); }
+.btn-ghost { background: var(--panel); color: var(--text-color); border-color: var(--border-strong); }
+.btn-ghost:hover { background: var(--hover-bg); }
+.btn-danger { background: var(--danger); color: #fff; }
+
+.table-row:hover { background: var(--hover-bg); cursor: default; }
+.modal-backdrop { background: rgba(16, 24, 40, 0.5); backdrop-filter: blur(6px); }
+
+/* Konzistentan unutrašnji razmak sadržaja modala (sprečava da tekst/dugmad
+   dodiruju ivice prozora) + pouzdano skrolovanje na malim ekranima. */
+.modal-body-scroll { padding: 1.5rem 1.75rem; }
+@media (max-width: 640px) { .modal-body-scroll { padding: 1.15rem 1.15rem; } }
+/* Ako sadržaj modala već ima sopstveni "card" sa razmakom, izbegni dupli okvir. */
+.modal-body-scroll > form { margin: 0; }
+.file-link { color: var(--accent); text-decoration: none; cursor: pointer; font-weight: 600; border-bottom: 1px solid transparent; }
+.file-link:hover { border-bottom-color: var(--accent); }
+.notification-link { color: var(--accent); text-decoration: none; cursor: pointer; font-weight: 600; }
+.notification-link:hover { text-decoration: underline; }
+.hidden { display: none !important; }
+.data-table tr:hover td { background: var(--hover-bg); }
+.clickable-row { cursor: pointer; font-weight: 600; color: var(--accent); }
+.tag { padding: 3px 9px; border-radius: 999px; font-size: 0.72rem; font-weight: 600; letter-spacing: 0.01em; }
+
+/* Custom Animacije Scrollbara */
+.custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+.custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+/* Animacija za pozadinu na Login Stranici */
+@keyframes blob {
+  0% { transform: translate(0px, 0px) scale(1); }
+  33% { transform: translate(30px, -50px) scale(1.1); }
+  66% { transform: translate(-20px, 20px) scale(0.9); }
+  100% { transform: translate(0px, 0px) scale(1); }
+}
+.animate-blob { animation: blob 7s infinite; }
+.animation-delay-2000 { animation-delay: 2s; }
+
+/* =========================================
+   AUTOCOMPLETE I KARTICE
+   ========================================= */
+.autocomplete-container { position: relative; }
+.autocomplete-items { position: absolute; border: 1px solid var(--border); border-top: none; z-index: 99; top: 100%; left: 0; right: 0; background-color: var(--panel); max-height: 200px; overflow-y: auto; border-radius: 0 0 8px 8px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); }
+.autocomplete-items div { padding: 10px 14px; cursor: pointer; color: var(--text-color); border-bottom: 1px solid var(--border); }
+.autocomplete-items div:last-child { border-bottom: none; }
+.autocomplete-items div:hover { background-color: rgba(37, 99, 235, 0.05); color: var(--accent); }
+.autocomplete-active { background-color: var(--accent) !important; color: white !important; }
+
+.detail-view-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem; }
+.detail-card { background-color: var(--panel); padding: 1.5rem; border-radius: 1rem; border: 1px solid var(--border); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
+.detail-card h4 { font-weight: 800; color: var(--accent); margin-bottom: 1rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; }
+.detail-item { display: flex; justify-content: space-between; padding: 0.6rem 0; border-bottom: 1px dashed var(--border); }
+.detail-item:last-child { border-bottom: none; }
+.detail-item span:first-child { font-weight: 600; color: var(--muted); }
+.detail-item span:last-child { text-align: right; font-weight: 600; }
+
+.kanban-board { display: flex; gap: 1rem; overflow-x: auto; padding-bottom: 1rem; min-height: 400px; }
+.kanban-column { flex: 1; min-width: 320px; background-color: var(--panel); border-radius: 1rem; padding: 1rem; border: 1px solid var(--border); display: flex; flex-direction: column; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
+.kanban-column h3 { font-weight: 800; margin-bottom: 1rem; padding-bottom: 0.75rem; border-bottom: 2px solid var(--border); color: var(--accent); text-transform: uppercase; font-size: 0.9rem; letter-spacing: 0.05em;}
+.kanban-cards { flex-grow: 1; display: flex; flex-direction: column; gap: 0.75rem; }
+.kanban-card { background-color: var(--card); border: 1px solid var(--border); border-radius: 0.75rem; padding: 1.25rem; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.05); transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s; }
+.kanban-card:hover { transform: translateY(-3px); border-color: var(--accent); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); }
+
+.network-card { background-color: var(--panel); border: 1px solid var(--border); border-radius: 0.75rem; padding: 1.25rem; display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; box-shadow: 0 2px 4px rgba(0,0,0,0.05);}
+.network-flow { display: flex; align-items: center; gap: 1rem; flex: 1; }
+.network-node { font-weight: bold; color: #fff; background-color: var(--accent); padding: 0.5rem 1.25rem; border-radius: 0.5rem; cursor: pointer; transition: transform 0.2s; box-shadow: 0 4px 6px -1px rgba(37,99,235,0.3); }
+.network-node:hover { transform: scale(1.05); }
+.network-edge { color: var(--muted); font-size: 0.85rem; text-align: center; flex: 1; position: relative; font-weight: 600;}
+.network-edge::after { content: "►"; position: absolute; right: -15px; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: 1.2rem;}
+
+/* =========================================
+   STILIZACIJA INVOICE & OFFER MODALA
+   ========================================= */
+#invoice-modal-content, #offer-modal-content { max-width: 8.5in; background-color: #ffffff; color: #111827; }
+#invoice-body, #offer-body { font-family: 'Arial', sans-serif; }
+.invoice-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 2rem; }
+.invoice-header img { max-width: 150px; max-height: 75px; }
+.invoice-details table { width: auto; margin-left: auto; }
+.invoice-details td { padding: 2px 8px; text-align: right; }
+.invoice-parties { display: flex; justify-content: space-between; margin-bottom: 2rem; }
+.invoice-table { width: 100%; border-collapse: collapse; margin-bottom: 1.5rem; }
+.invoice-table th, .invoice-table td { border: 1px solid #d1d5db; padding: 0.75rem; text-align: left; }
+.invoice-table th { background-color: #f3f4f6; }
+.invoice-table .text-right { text-align: right; }
+.invoice-summary { display: flex; justify-content: flex-end; }
+.invoice-summary table { width: 40%; }
+.invoice-summary td { padding: 4px 8px; }
+.invoice-footer { margin-top: 3rem; padding-top: 1rem; border-top: 2px solid #111827; font-size: 0.8rem; text-align: center; }
+
+/* =========================================
+   SPRECAVANJE PRESECANJA TABELA U PDF-U
+   ========================================= */
+.break-inside-avoid, 
+tr, 
+thead, 
+.invoice-summary, 
+.invoice-footer,
+.invoice-parties,
+.invoice-header {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+}
+
+.invoice-table {
+    page-break-inside: auto;
+}
+
+@media print {
+  @page { margin: 10mm; size: A4; }
+  body { background: white !important; }
+  body * { visibility: hidden; }
+  
+  #modal-backdrop { 
+    visibility: visible !important; position: absolute !important; 
+    left: 0 !important; top: 0 !important; width: 100% !important; 
+    height: auto !important; background: none !important; 
+    overflow: visible !important; display: block !important; padding: 0 !important; 
+  }
+  
+  #modal-content { 
+    visibility: visible !important; box-shadow: none !important; 
+    background: white !important; width: 100% !important; max-width: 100% !important; 
+    margin: 0 !important; padding: 0 !important; border: none !important; overflow: visible !important; 
+  }
+  
+  #modal-body, #invoice-body, #offer-body { 
+    visibility: visible !important; overflow: visible !important; 
+    max-height: none !important; height: auto !important; padding: 0 !important; 
+  }
+  
+  #invoice-container, #invoice-container *, 
+  #offer-container, #offer-container * { visibility: visible; }
+  
+  #invoice-container, #offer-container { position: absolute; left: 0; top: 0; width: 100%; }
+
+  #invoice-controls, #offer-controls, .btn, button, #modal-close-btn { display: none !important; }
+  .border-b.mb-4.pb-3 { display: none !important; }
+
+  .text-gray-400, .text-muted { color: #4b5563 !important; }
+  .text-blue-500, .text-accent { color: #3b82f6 !important; }
+  .bg-gray-100 { background-color: #f3f4f6 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .bg-gray-800, .bg-panel { background-color: #f3f4f6 !important; color: black !important; border:1px solid #d1d5db; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  
+  ::-webkit-scrollbar { display: none !important; }
+}
+/* --- FIX ZA PROFESIONALNI PDF IZGLED --- */
+@media print, pdf {
+    #invoice-body, #offer-body {
+        width: 100% !important;
+        max-width: 100% !important;
+        display: block !important;
+        padding: 0 !important;
+    }
+    
+    .invoice-table {
+        table-layout: fixed !important; /* Ovo sprečava da se tabele "skupljaju" */
+        width: 100% !important;
+        border-collapse: collapse !important;
+    }
+    
+    .invoice-table th, .invoice-table td {
+        word-wrap: break-word !important;
+        padding: 8px !important;
+    }
+
+    .invoice-header {
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+        margin-bottom: 30px !important;
+    }
+}
+/* --- PROFESIONALNI PDF IZGLED (WORD STYLE) --- */
+@media print {
+    /* Sprečavamo prelom elemenata */
+    .invoice-table, .invoice-header, .invoice-parties, .invoice-summary {
+        break-inside: avoid !important;
+    }
+    
+    /* Fiksiramo tabele da popune stranicu */
+    .invoice-table {
+        table-layout: fixed !important;
+        width: 100% !important;
+        border: 1px solid #000 !important;
+    }
+    
+    .invoice-table td, .invoice-table th {
+        border: 1px solid #000 !important;
+        padding: 8px !important;
+    }
+}
+
+/* Osnovni stil za dokument u PDF-u */
+#invoice-body, #offer-body {
+    font-family: 'Times New Roman', serif !important; /* Word font */
+    font-size: 12pt !important;
+    line-height: 1.4 !important;
+    color: #000 !important;
+}
+/* ==========================================================
+   UX POLISH — TOOLTIPS, VISUAL HIERARCHY, HELPER TEXT
+   ========================================================== */
+
+/* Pure-CSS tooltip. Dodajte data-tooltip="Poruka" na bilo koji element.
+   Prikazuje se posle 400ms hover-a, sa profesionalnim slate-800 pozadinom.
+   Ne blokira click, ne pravi race sa focusom.
+*/
+[data-tooltip] {
+    position: relative;
+}
+[data-tooltip]::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 50%;
+    transform: translateX(-50%) translateY(4px);
+    background: #1e293b;
+    color: #f1f5f9;
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 1.4;
+    letter-spacing: 0.01em;
+    padding: 6px 10px;
+    border-radius: 6px;
+    white-space: pre;
+    max-width: 260px;
+    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.25);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s ease, transform 0.15s ease;
+    transition-delay: 0s;
+    z-index: 9999;
+}
+[data-tooltip]::before {
+    content: '';
+    position: absolute;
+    bottom: calc(100% + 2px);
+    left: 50%;
+    transform: translateX(-50%);
+    border: 6px solid transparent;
+    border-top-color: #1e293b;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s ease;
+    z-index: 9999;
+}
+[data-tooltip]:hover::after,
+[data-tooltip]:hover::before,
+[data-tooltip]:focus-visible::after,
+[data-tooltip]:focus-visible::before {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+    transition-delay: 0.4s;
+}
+[data-tooltip-position="right"]::after {
+    bottom: auto;
+    top: 50%;
+    left: calc(100% + 8px);
+    transform: translateY(-50%) translateX(4px);
+}
+[data-tooltip-position="right"]::before {
+    bottom: auto;
+    top: 50%;
+    left: calc(100% + 2px);
+    transform: translateY(-50%);
+    border: 6px solid transparent;
+    border-right-color: #1e293b;
+    border-top-color: transparent;
+}
+[data-tooltip-position="right"]:hover::after,
+[data-tooltip-position="right"]:focus-visible::after {
+    transform: translateY(-50%) translateX(0);
+}
+
+/* Helper text ispod input polja (opciono) */
+.form-help {
+    display: block;
+    font-size: 11px;
+    color: #64748b;
+    margin-top: 4px;
+    line-height: 1.4;
+}
+.form-help.form-help-error { color: #b91c1c; }
+.form-help.form-help-success { color: #047857; }
+
+/* Info ikonica koja pokreće tooltip */
+.help-hint {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    background: #e2e8f0;
+    color: #475569;
+    font-size: 10px;
+    font-weight: 800;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    margin-left: 6px;
+    cursor: help;
+    user-select: none;
+    transition: all 0.15s ease;
+}
+.help-hint:hover { background: #cbd5e1; color: #1e293b; }
+
+/* Sekcije unutar Settings modala — jasnija hijerarhija */
+.settings-section-header {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    margin: 24px 0 12px 0;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #e2e8f0;
+}
+.settings-section-header h3 {
+    font-size: 15px;
+    font-weight: 700;
+    color: #0f172a;
+    margin: 0;
+    letter-spacing: -0.01em;
+}
+.settings-section-header .section-desc {
+    font-size: 12px;
+    color: #64748b;
+    margin: 0;
+}
+
+/* Prime action button — subtile depth for CTAs */
+.btn-primary {
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06),
+                inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    transition: transform 0.08s ease, box-shadow 0.15s ease;
+}
+.btn-primary:hover {
+    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.15),
+                inset 0 1px 0 rgba(255, 255, 255, 0.15);
+}
+.btn-primary:active { transform: translateY(1px); }
+
+/* Focus ring za accessibility — vidljiv kada korisnik navigira Tab-om */
+button:focus-visible, a:focus-visible, input:focus-visible,
+select:focus-visible, textarea:focus-visible, [role="button"]:focus-visible {
+    outline: 2px solid #3b82f6;
+    outline-offset: 2px;
+    box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.15);
+}
+
+/* Skeleton loading za tabele — koristi .skeleton na td/div dok se učitava */
+.skeleton {
+    background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+    background-size: 200% 100%;
+    animation: skeleton-shimmer 1.4s ease-in-out infinite;
+    border-radius: 4px;
+    color: transparent;
+    user-select: none;
+    pointer-events: none;
+}
+@keyframes skeleton-shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+/* Responzivne popravke za male ekrane */
+@media (max-width: 640px) {
+    .btn { min-height: 44px; padding: 10px 16px; }  /* iOS-standard 44px touch target */
+    [data-tooltip]::after { max-width: 90vw; white-space: normal; }
+    .settings-section-header { flex-direction: column; align-items: flex-start; gap: 2px; }
+}
+
+/* ==========================================================
+   ANTI-OVERLAP — sistemski ispravci gustih formi
+   Bazira se na tome da su labels + inputs + helpers grupisani
+   u .form-field / .form-row wrapper-ima. Osigurava se dovoljno
+   vertikalnog prostora bez obzira na sadržaj.
+   ========================================================== */
+
+.form-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 12px;
+    min-width: 0;   /* sprečava overflow u flex/grid kontejnerima */
+}
+.form-field > label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #374151;
+    line-height: 1.3;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+.form-field > label .req {
+    color: #dc2626;
+    font-weight: 800;
+}
+.form-field > label .optional {
+    color: #94a3b8;
+    font-weight: 500;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-left: auto;
+}
+.form-field .form-help,
+.form-field small,
+.form-field .helper {
+    font-size: 11px;
+    color: #64748b;
+    line-height: 1.4;
+    margin-top: 2px;
+}
+.form-field input,
+.form-field select,
+.form-field textarea {
+    width: 100%;
+    box-sizing: border-box;
+    min-height: 40px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    border: 1px solid #d1d5db;
+    background: #fff;
+    font-size: 14px;
+    line-height: 1.4;
+    transition: border-color .15s, box-shadow .15s;
+}
+.form-field textarea {
+    min-height: 80px;
+    resize: vertical;
+    font-family: inherit;
+}
+.form-field input:focus,
+.form-field select:focus,
+.form-field textarea:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+.form-field.error input,
+.form-field.error select,
+.form-field.error textarea {
+    border-color: #ef4444;
+    background: #fef2f2;
+}
+.form-field.error .form-help {
+    color: #b91c1c;
+    font-weight: 600;
+}
+
+/* Row layout — auto-fitno collapse na mobilu */
+.form-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 12px 16px;
+    margin-bottom: 12px;
+}
+.form-row.cols-2 { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+.form-row.cols-3 { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
+.form-row.cols-4 { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
+
+@media (max-width: 640px) {
+    .form-row,
+    .form-row.cols-2,
+    .form-row.cols-3,
+    .form-row.cols-4 {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+}
+
+/* Section header — vizuelna hijerarhija između grupa polja */
+.form-section {
+    margin-bottom: 24px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid #e5e7eb;
+}
+.form-section:last-child { border-bottom: 0; padding-bottom: 0; }
+.form-section h4.section-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: #0f172a;
+    margin: 0 0 4px 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.form-section .section-desc {
+    font-size: 12px;
+    color: #64748b;
+    margin: 0 0 12px 0;
+    line-height: 1.5;
+}
+.form-section .step-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px; height: 22px;
+    border-radius: 999px;
+    background: #3b82f6;
+    color: #fff;
+    font-size: 11px;
+    font-weight: 800;
+}
+
+/* Number input polish — no arrow spinner, no line jumps */
+input[type="number"].no-spin {
+    -moz-appearance: textfield;
+    appearance: textfield;
+}
+input[type="number"].no-spin::-webkit-outer-spin-button,
+input[type="number"].no-spin::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+/* Ako label sadrži i tekst i badge (npr. * required),
+   sprečimo da label wrap-uje na 2 reda zbog čega inputi ispod
+   se preklapaju sa poljima iznad. */
+label {
+    max-width: 100%;
+    overflow-wrap: break-word;
+}
+
+/* ==========================================================
+   UNIVERZALNA ANTI-OVERLAP PRAVILA ZA FORME
+   Radi bez obzira na inline Tailwind klase — targetira sve
+   modalne forme, jer je preklapanje najčešće tamo.
+   ========================================================== */
+
+/* Modal body + form: preventuj horizontal overflow na uskim viewport-ima */
+#modal-body,
+#modal-backdrop form,
+.tab-content form,
+.ptab-pane {
+    max-width: 100%;
+    overflow-wrap: break-word;
+    word-wrap: break-word;
+}
+
+/* Sva label + input polja u grid-u treba da su ALIGN-START, ne stretch,
+   jer stretch pravi da label sa 2 reda "gura" input dole u sledeći red. */
+#modal-body .grid,
+.tab-content .grid,
+.ptab-pane .grid {
+    align-items: start;
+}
+
+/* Svi input-i u formama moraju da poštuju box-sizing */
+#modal-body input,
+#modal-body select,
+#modal-body textarea,
+.tab-content input,
+.tab-content select,
+.tab-content textarea,
+.ptab-pane input,
+.ptab-pane select,
+.ptab-pane textarea {
+    box-sizing: border-box;
+    max-width: 100%;
+}
+
+/* Labeli — ne dozvoli da label nadvisi input širinu */
+#modal-body label,
+.tab-content label,
+.ptab-pane label {
+    max-width: 100%;
+    overflow-wrap: break-word;
+}
+
+/* Number input sa placeholder-om — placeholder je muted; korisniku ne treba
+   flicker kada kuca. Chrome nekada "reset-uje" cursor ako input.value
+   promeni type. Ovo pomaže da placeholder ostane u fokusu. */
+input[type="number"] {
+    -moz-appearance: textfield;
+    line-height: 1.4;
+}
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+    height: auto;
+    margin: 0;
+}
+
+/* Currency select kraj number input-a — flex row koji ne prelazi na 2 reda */
+.currency-input-pair {
+    display: flex;
+    gap: 8px;
+    align-items: stretch;
+    min-width: 0;
+}
+.currency-input-pair > input[type="number"] {
+    flex: 1 1 0%;
+    min-width: 0;   /* dozvoli shrink */
+}
+.currency-input-pair > select {
+    flex: 0 0 auto;
+    width: auto;
+    min-width: 80px;
+}
+
+/* Mobilno: SVA grid polja postaju stacked, ne 2/3/4 kolone. Tailwind ovo
+   ne pokriva u modalima jer je koristio md: prefix koji za uske ekrane
+   prestaje da bude Grid. */
+@media (max-width: 640px) {
+    #modal-body .grid.grid-cols-2,
+    #modal-body .grid.grid-cols-3,
+    #modal-body .grid.grid-cols-4,
+    #modal-body .grid.md\:grid-cols-2,
+    #modal-body .grid.md\:grid-cols-3,
+    #modal-body .grid.md\:grid-cols-4 {
+        grid-template-columns: 1fr !important;
+    }
+    #modal-body .card {
+        padding: 12px !important;
+    }
+    #modal-body .tab-content,
+    #modal-body form {
+        padding: 0 4px;
+    }
+    .prod-tab-btn, .ptab-btn, .tab-btn {
+        padding: 10px 12px !important;
+        font-size: 12px !important;
+    }
+}
+
+/* Fixed footer u modalima — dugmiće ostaju vidljivi pri scrollovanju */
+.modal-footer,
+#modal-backdrop .flex.justify-end {
+    position: sticky;
+    bottom: 0;
+    background: inherit;
+}
+
+/* ==========================================================
+   CRM FORM DESIGN SYSTEM (crm-*)
+   Jedinstven look-and-feel za sve admin forme (Products, Offers,
+   Deals, Demands, Partners) — pun anti-overlap sa jasnim
+   vizuelnim grupisanjem sekcija.
+   ========================================================== */
+
+.crm-form-panel {
+    background: #f8fafc;
+    border: 1px solid #e5e7eb;
+    border-radius: 14px;
+    padding: 20px;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+@media (max-width: 640px) {
+    .crm-form-panel { padding: 14px; }
+}
+
+.crm-form-section {
+    padding-bottom: 20px;
+    margin-bottom: 20px;
+    border-bottom: 1px solid #e5e7eb;
+}
+.crm-form-section:last-child { border-bottom: 0; margin-bottom: 0; padding-bottom: 0; }
+
+.crm-form-section-title {
+    font-size: 13px;
+    font-weight: 800;
+    color: #0f172a;
+    letter-spacing: -0.005em;
+    margin: 0 0 4px 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.crm-form-section-desc {
+    font-size: 12px;
+    color: #64748b;
+    line-height: 1.5;
+    margin: 0 0 14px 0;
+}
+
+.crm-form-section-highlighted {
+    background: linear-gradient(180deg, #eff6ff 0%, #ffffff 100%);
+    border: 1px solid #bfdbfe;
+    border-radius: 12px;
+    padding: 16px;
+    margin-top: 12px;
+}
+
+.crm-form-section-highlighted-green {
+    background: linear-gradient(180deg, #ecfdf5 0%, #ffffff 100%);
+    border: 1px solid #a7f3d0;
+    border-radius: 12px;
+    padding: 16px;
+    margin-top: 12px;
+}
+
+.crm-form-subsection {
+    margin-top: 16px;
+    padding: 14px;
+    background: #eff6ff;
+    border-radius: 10px;
+    border: 1px solid #dbeafe;
+}
+.crm-form-subsection-title {
+    font-size: 11px;
+    font-weight: 800;
+    color: #1e40af;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    margin: 0 0 6px 0;
+}
+
+.crm-form-grid {
+    display: grid;
+    gap: 14px;
+    align-items: start;
+    margin-bottom: 12px;
+}
+.crm-form-grid:last-child { margin-bottom: 0; }
+.crm-form-grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.crm-form-grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.crm-form-grid-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+@media (max-width: 900px) {
+    .crm-form-grid-3, .crm-form-grid-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 640px) {
+    .crm-form-grid-2,
+    .crm-form-grid-3,
+    .crm-form-grid-4 { grid-template-columns: 1fr; gap: 12px; }
+}
+.crm-field-span-2 { grid-column: span 2; }
+@media (max-width: 900px) {
+    .crm-field-span-2 { grid-column: span 2; }
+}
+@media (max-width: 640px) {
+    .crm-field-span-2 { grid-column: span 1; }
+}
+
+.crm-field {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    gap: 4px;
+}
+
+.crm-label {
+    display: block;
+    font-size: 10px;
+    font-weight: 800;
+    color: #64748b;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    line-height: 1.3;
+    max-width: 100%;
+    overflow-wrap: break-word;
+    margin-bottom: 2px;
+}
+.crm-label-required::after {
+    content: ' *';
+    color: #ef4444;
+    font-weight: 800;
+}
+.crm-label-emphasis {
+    color: #1e40af;
+    font-size: 11px;
+}
+.crm-label-warning {
+    color: #dc2626;
+}
+
+.crm-input,
+select.crm-input,
+textarea.crm-input {
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 40px;
+    padding: 8px 12px;
+    background: #fff;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    color: #0f172a;
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.4;
+    transition: border-color .15s, box-shadow .15s;
+    font-family: inherit;
+}
+.crm-input:focus,
+select.crm-input:focus,
+textarea.crm-input:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.18);
+}
+textarea.crm-input {
+    min-height: 72px;
+    resize: vertical;
+}
+select.crm-input {
+    padding-right: 30px;
+    appearance: none;
+    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="%23475569"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>');
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+    background-size: 16px;
+}
+.crm-input-mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.crm-input-bold { font-weight: 800; color: #0f172a; }
+.crm-input-price {
+    font-size: 16px;
+    font-weight: 800;
+    color: #1e40af;
+    background: #eff6ff;
+    border-color: #bfdbfe;
+}
+.crm-input-price:focus {
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.22);
+}
+.crm-input-warning {
+    background: #fef2f2;
+    border-color: #fecaca;
+    color: #991b1b;
+}
+.crm-input-green {
+    background: #ecfdf5;
+    border-color: #a7f3d0;
+    color: #065f46;
+}
+
+/* Price + currency para: flex sa min-width:0 na input, fiksna width select-a */
+.crm-input-pair {
+    display: flex;
+    gap: 8px;
+    align-items: stretch;
+    min-width: 0;
+}
+.crm-input-pair > .crm-input {
+    flex: 1 1 0%;
+    min-width: 0;
+}
+.crm-input-pair > .crm-input-suffix {
+    flex: 0 0 auto;
+    width: 90px;
+    background-color: #f1f5f9;
+    text-align: center;
+    font-weight: 800;
+}
+
+.crm-help {
+    font-size: 11px;
+    color: #64748b;
+    line-height: 1.4;
+    margin: 4px 0 0 0;
+}
+
+.crm-empty {
+    text-align: center;
+    padding: 40px 16px;
+    font-size: 13px;
+    color: #94a3b8;
+    font-style: italic;
+    border: 2px dashed #cbd5e1;
+    border-radius: 12px;
+    font-weight: 600;
+}
+
+.crm-list-scrollable {
+    max-height: 400px;
+    overflow-y: auto;
+    padding-right: 4px;
+}
+
+.crm-form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 16px;
+    padding-top: 14px;
+    border-top: 1px solid #e5e7eb;
+}
+@media (max-width: 640px) {
+    .crm-form-actions {
+        flex-direction: column-reverse;
+    }
+    .crm-form-actions .crm-btn { width: 100%; }
+}
+
+.crm-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 10px 20px;
+    border-radius: 10px;
+    border: 1px solid transparent;
+    font-size: 13px;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    cursor: pointer;
+    transition: transform .1s, box-shadow .15s, background-color .15s;
+    min-height: 40px;
+    font-family: inherit;
+}
+.crm-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+.crm-btn-primary { background: #2563eb; color: #fff; box-shadow: 0 2px 4px rgba(37, 99, 235, 0.24); }
+.crm-btn-primary:hover { background: #1d4ed8; box-shadow: 0 4px 10px rgba(37, 99, 235, 0.28); }
+.crm-btn-success { background: #059669; color: #fff; box-shadow: 0 2px 4px rgba(5, 150, 105, 0.24); }
+.crm-btn-success:hover { background: #047857; }
+.crm-btn-danger { background: #dc2626; color: #fff; }
+.crm-btn-danger:hover { background: #b91c1c; }
+.crm-btn-ghost { background: #fff; color: #475569; border-color: #cbd5e1; }
+.crm-btn-ghost:hover { background: #f8fafc; }
+
+.crm-tag-wrap,
+.crm-chip-wrap {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 10px;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    min-height: 46px;
+    align-items: center;
+}
+.crm-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    background: #f1f5f9;
+    border: 1px solid #e2e8f0;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+    color: #334155;
+    cursor: pointer;
+    transition: background-color .1s;
+}
+.crm-chip:hover { background: #e2e8f0; }
+.crm-chip input[type="checkbox"] {
+    width: 14px; height: 14px; margin: 0;
+    accent-color: #2563eb;
+}

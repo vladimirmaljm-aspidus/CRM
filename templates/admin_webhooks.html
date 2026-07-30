@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Outbound Webhooks — Aspidus CRM</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body { font-family: Inter, ui-sans-serif, system-ui, sans-serif; background: linear-gradient(180deg,#f8fafc,#eef2f7); min-height:100vh; }
+  .card { background:white; border-radius:14px; border:1px solid #e5e7eb; }
+  .btn { padding:6px 12px; border-radius:8px; font-weight:600; font-size:12px; cursor:pointer; }
+  .btn-primary { background:linear-gradient(135deg,#4f46e5,#7c3aed); color:white; }
+  .btn-ghost { background:white; color:#334155; border:1px solid #e5e7eb; }
+  .btn-danger { background:#fee2e2; color:#dc2626; }
+  input, select, textarea { padding:8px 12px; border:1px solid #e2e8f0; border-radius:8px; font-size:13px; width:100%; }
+  input:focus, select:focus, textarea:focus { outline:none; border-color:#4f46e5; box-shadow:0 0 0 3px rgba(79,70,229,.15); }
+  .pill { display:inline-block; padding:2px 8px; border-radius:99px; font-size:10px; font-weight:700; }
+  .pill-ok { background:#dcfce7; color:#166534; }
+  .pill-off { background:#f1f5f9; color:#475569; }
+  .pill-err { background:#fee2e2; color:#991b1b; }
+</style>
+<script src="/static/js/core/breadcrumbs.js" defer></script>
+</head>
+<body class="p-4 md:p-6">
+<div class="max-w-6xl mx-auto">
+  <div id="breadcrumbs-mount" class="mb-3"></div>
+  <div class="flex items-center justify-between mb-6 flex-wrap gap-2">
+    <div class="flex items-center gap-3">
+      <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white flex items-center justify-center text-xl">🔗</div>
+      <div>
+        <h1 class="text-2xl font-bold text-slate-900">Outbound Webhooks & API Keys</h1>
+        <p class="text-xs text-slate-500 mt-0.5">Slanje događaja na spoljne servise (Zapier, custom bots) + izdavanje API ključeva.</p>
+      </div>
+    </div>
+    <a href="/" class="btn btn-ghost">← CRM</a>
+  </div>
+
+  <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
+    <!-- WEBHOOKS -->
+    <div class="card p-5">
+      <b class="text-sm">Webhooks</b>
+      <div id="webhook-list" class="mt-3 space-y-2 text-sm text-slate-500">⏳</div>
+
+      <div class="mt-4 pt-4 border-t border-slate-100">
+        <b class="text-xs uppercase text-slate-600">Add new webhook</b>
+        <form onsubmit="return addWebhook(event)" class="mt-2 space-y-2">
+          <input id="wh-name" placeholder="Name (e.g., Zapier deal-notification)" required>
+          <input id="wh-url" placeholder="https://hooks.zapier.com/…" required>
+          <input id="wh-events" placeholder="Events CSV (e.g. deal.created,offer.accepted,invoice.paid,partners.bulk_archive)" required>
+          <div class="text-xs text-slate-500">
+            Available: <code>partners.bulk_archive</code>, <code>partners.bulk_tag</code>, <code>partners.bulk_delete</code>,
+            <code>deals.bulk_*</code>, <code>products.bulk_*</code>, <code>offers.bulk_*</code>, <code>invoices.bulk_*</code>,
+            or <code>*</code> for all.
+          </div>
+          <button class="btn btn-primary w-full">+ Create webhook</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- API KEYS -->
+    <div class="card p-5">
+      <b class="text-sm">API Keys</b>
+      <div id="apikey-list" class="mt-3 space-y-2 text-sm text-slate-500">⏳</div>
+
+      <div class="mt-4 pt-4 border-t border-slate-100">
+        <b class="text-xs uppercase text-slate-600">Issue new API key</b>
+        <form onsubmit="return addApiKey(event)" class="mt-2 space-y-2">
+          <input id="ak-name" placeholder="Name (e.g., Nightly-sync-script)" required>
+          <select id="ak-scope">
+            <option value="read">Scope: Read-only</option>
+            <option value="write">Scope: Read + Write</option>
+            <option value="admin">Scope: Admin (dangerous)</option>
+          </select>
+          <input id="ak-rate" type="number" value="60" min="1" max="600" placeholder="Rate limit (req/min)">
+          <button class="btn btn-primary w-full">+ Generate key</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+<script nonce="{{ g.csp_nonce }}">
+let csrf='';
+async function _csrf(){ if(csrf)return csrf; csrf=(await(await fetch('/api/csrf/token')).json()).csrf_token||''; return csrf; }
+function esc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));}
+if(window.setBreadcrumbs) window.setBreadcrumbs([{label:'Admin'}, {label:'Webhooks & API'}]);
+
+async function loadAll() {
+  const [w, k] = await Promise.all([
+    fetch('/api/webhooks').then(r=>r.json()),
+    fetch('/api/api-keys').then(r=>r.json()),
+  ]);
+  document.getElementById('webhook-list').innerHTML = (w.webhooks||[]).length
+    ? w.webhooks.map(x => `
+        <div class="p-3 rounded-lg border border-slate-200">
+          <div class="flex items-center justify-between">
+            <b>${esc(x.name)}</b>
+            <span class="pill ${x.last_status==='ok'?'pill-ok':(x.is_active?'pill-off':'pill-err')}">${x.is_active?(x.last_status||'ready'):'disabled'}</span>
+          </div>
+          <div class="text-xs text-slate-500 truncate mt-0.5">${esc(x.target_url)}</div>
+          <div class="text-[10px] text-slate-400 mt-1">
+            Events: ${x.events.map(esc).join(', ')} · Fails: ${x.fail_count||0}
+            ${x.last_fired_at?' · Last fired '+esc(x.last_fired_at.substring(0,19).replace('T',' ')):''}
+          </div>
+          <div class="mt-2 flex gap-2">
+            <button class="btn btn-ghost" onclick="showDeliveries('${x.id}')">Deliveries</button>
+            <button class="btn btn-danger" onclick="delWebhook('${x.id}')">Delete</button>
+          </div>
+        </div>`).join('')
+    : '<div class="text-slate-400 italic text-xs">No webhooks yet.</div>';
+
+  document.getElementById('apikey-list').innerHTML = (k.keys||[]).length
+    ? k.keys.map(x => `
+        <div class="p-3 rounded-lg border border-slate-200 ${x.revoked?'opacity-50':''}">
+          <div class="flex items-center justify-between">
+            <b>${esc(x.name)}</b>
+            <span class="pill ${x.revoked?'pill-off':'pill-ok'}">${x.revoked?'revoked':x.scope}</span>
+          </div>
+          <div class="text-xs text-slate-500 mt-0.5">Key: <code>${esc(x.key_prefix)}…</code> · ${x.rate_limit_per_min}/min</div>
+          <div class="text-[10px] text-slate-400 mt-1">
+            ${x.last_used_at?'Last used '+esc(x.last_used_at.substring(0,19).replace('T',' ')):'Never used'}
+          </div>
+          ${!x.revoked?`<button class="btn btn-danger mt-2" onclick="revokeKey('${x.id}')">Revoke</button>`:''}
+        </div>`).join('')
+    : '<div class="text-slate-400 italic text-xs">No API keys yet.</div>';
+}
+
+async function addWebhook(e) {
+  e.preventDefault();
+  const csrfTok = await _csrf();
+  const body = {
+    name: document.getElementById('wh-name').value.trim(),
+    target_url: document.getElementById('wh-url').value.trim(),
+    events: document.getElementById('wh-events').value.split(',').map(s=>s.trim()).filter(Boolean),
+  };
+  const r = await fetch('/api/webhooks', {method:'POST', headers:{'Content-Type':'application/json','X-CSRF-Token':csrfTok}, body: JSON.stringify(body)});
+  const j = await r.json();
+  if (r.ok) {
+    alert(`✓ Webhook kreiran.\n\nHMAC signing secret (sacuvaj ga sad — nece se vise prikazati):\n${j.secret}`);
+    e.target.reset();
+    loadAll();
+  } else alert('✗ ' + (j.error || r.status));
+  return false;
+}
+
+async function delWebhook(id) {
+  if (!confirm('Delete webhook + delivery history?')) return;
+  const csrfTok = await _csrf();
+  await fetch('/api/webhooks/' + id, {method:'DELETE', headers:{'X-CSRF-Token':csrfTok}});
+  loadAll();
+}
+
+async function showDeliveries(wid) {
+  const j = await (await fetch(`/api/webhooks/${wid}/deliveries`)).json();
+  const d = j.deliveries || [];
+  const txt = d.length ? d.slice(0,20).map(x =>
+    `${(x.delivered_at||'').substring(0,19)} — ${x.event} — HTTP ${x.status_code} (${x.duration_ms}ms)`
+  ).join('\n') : 'No deliveries yet.';
+  alert('Recent deliveries:\n\n' + txt);
+}
+
+async function addApiKey(e) {
+  e.preventDefault();
+  const csrfTok = await _csrf();
+  const body = {
+    name: document.getElementById('ak-name').value.trim(),
+    scope: document.getElementById('ak-scope').value,
+    rate_limit_per_min: parseInt(document.getElementById('ak-rate').value || '60'),
+  };
+  const r = await fetch('/api/api-keys', {method:'POST', headers:{'Content-Type':'application/json','X-CSRF-Token':csrfTok}, body: JSON.stringify(body)});
+  const j = await r.json();
+  if (r.ok) {
+    prompt(`✓ API key generated. SAVE IT NOW — this is the ONLY time you'll see it.\n\nUse as: Authorization: Bearer ${j.raw_key}`, j.raw_key);
+    e.target.reset();
+    loadAll();
+  } else alert('✗ ' + (j.error || r.status));
+  return false;
+}
+
+async function revokeKey(id) {
+  if (!confirm('Revoke this API key? All requests using it will 401 immediately.')) return;
+  const csrfTok = await _csrf();
+  await fetch(`/api/api-keys/${id}/revoke`, {method:'POST', headers:{'X-CSRF-Token':csrfTok}});
+  loadAll();
+}
+
+loadAll();
+</script>
+</body>
+</html>

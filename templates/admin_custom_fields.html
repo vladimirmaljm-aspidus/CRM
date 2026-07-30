@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Custom Fields — Aspidus CRM</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body { font-family: Inter, ui-sans-serif, system-ui, sans-serif; background: linear-gradient(180deg,#f8fafc,#eef2f7); min-height:100vh; }
+  .card { background:white; border-radius:14px; border:1px solid #e5e7eb; }
+  .btn { padding:6px 12px; border-radius:8px; font-weight:600; font-size:12px; cursor:pointer; }
+  .btn-primary { background:linear-gradient(135deg,#4f46e5,#7c3aed); color:white; }
+  .btn-ghost { background:white; color:#334155; border:1px solid #e5e7eb; }
+  .btn-danger { background:#fee2e2; color:#dc2626; }
+  input, select { padding:8px 12px; border:1px solid #e2e8f0; border-radius:8px; font-size:13px; width:100%; }
+  input:focus, select:focus { outline:none; border-color:#4f46e5; box-shadow:0 0 0 3px rgba(79,70,229,.15); }
+  table { width:100%; border-collapse:collapse; }
+  th { background:#f8fafc; padding:8px; text-align:left; font-size:11px; text-transform:uppercase; color:#475569; }
+  td { padding:8px; border-bottom:1px solid #f1f5f9; font-size:12px; }
+</style>
+<script src="/static/js/core/breadcrumbs.js" defer></script>
+</head>
+<body class="p-4 md:p-6">
+<div class="max-w-6xl mx-auto">
+  <div id="breadcrumbs-mount" class="mb-3"></div>
+  <div class="flex items-center justify-between mb-6 flex-wrap gap-2">
+    <div class="flex items-center gap-3">
+      <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white flex items-center justify-center text-xl">🧩</div>
+      <div>
+        <h1 class="text-2xl font-bold text-slate-900">Custom Fields</h1>
+        <p class="text-xs text-slate-500 mt-0.5">Dodaj proizvoljna polja na Partner / Product / Deal / Offer / Invoice / Proforma zapise.</p>
+      </div>
+    </div>
+    <a href="/" class="btn btn-ghost">← CRM</a>
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+    <div class="card p-4 lg:col-span-2">
+      <div class="flex items-center justify-between mb-3">
+        <b>Fields</b>
+        <select id="filter-entity" class="w-40" onchange="load()">
+          <option value="">All entities</option>
+          <option>partner</option><option>product</option><option>deal</option>
+          <option>offer</option><option>invoice</option><option>proforma</option>
+        </select>
+      </div>
+      <div class="overflow-x-auto">
+        <table>
+          <thead><tr><th>Entity</th><th>Key</th><th>Label</th><th>Type</th><th>Req</th><th>Order</th><th></th></tr></thead>
+          <tbody id="tbody"><tr><td colspan="7" class="text-center py-6 text-slate-400">⏳</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card p-4">
+      <b>Add new field</b>
+      <form onsubmit="return add(event)" class="mt-3 space-y-3">
+        <div>
+          <label class="text-xs font-semibold">Entity type</label>
+          <select id="f-entity" required>
+            <option value="">— pick —</option>
+            <option>partner</option><option>product</option><option>deal</option>
+            <option>offer</option><option>invoice</option><option>proforma</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-xs font-semibold">Field key (snake_case)</label>
+          <input id="f-key" placeholder="sap_code" required maxlength="60">
+        </div>
+        <div>
+          <label class="text-xs font-semibold">Label</label>
+          <input id="f-label" placeholder="SAP Code" required maxlength="120">
+        </div>
+        <div>
+          <label class="text-xs font-semibold">Type</label>
+          <select id="f-type">
+            <option value="text">Text</option>
+            <option value="number">Number</option>
+            <option value="date">Date</option>
+            <option value="bool">Checkbox</option>
+            <option value="select">Select (dropdown)</option>
+            <option value="url">URL</option>
+            <option value="email">Email</option>
+          </select>
+        </div>
+        <div id="options-block" class="hidden">
+          <label class="text-xs font-semibold">Options (jedna po redu)</label>
+          <textarea id="f-options" rows="3" class="w-full border rounded p-2 text-xs" placeholder="Option A&#10;Option B"></textarea>
+        </div>
+        <label class="flex items-center gap-2 text-xs">
+          <input type="checkbox" id="f-required">
+          Required
+        </label>
+        <div>
+          <label class="text-xs font-semibold">Display order</label>
+          <input id="f-order" type="number" value="100">
+        </div>
+        <button type="submit" class="btn btn-primary w-full">+ Create</button>
+      </form>
+    </div>
+  </div>
+</div>
+<script nonce="{{ g.csp_nonce }}">
+let csrf='';
+async function _csrf(){ if(csrf)return csrf; csrf=(await(await fetch('/api/csrf/token')).json()).csrf_token||''; return csrf; }
+function esc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));}
+if(window.setBreadcrumbs) window.setBreadcrumbs([{label:'Admin'}, {label:'Custom Fields'}]);
+
+document.getElementById('f-type').addEventListener('change', e => {
+  document.getElementById('options-block').classList.toggle('hidden', e.target.value !== 'select');
+});
+
+async function load() {
+  const ent = document.getElementById('filter-entity').value;
+  const r = await fetch('/api/custom-fields' + (ent ? `?entity=${ent}` : ''));
+  const j = await r.json();
+  const rows = j.fields || [];
+  document.getElementById('tbody').innerHTML = rows.length
+    ? rows.map(f => `<tr>
+        <td><span class="px-2 py-0.5 bg-slate-100 rounded text-xs">${esc(f.entity_type)}</span></td>
+        <td><code class="text-xs">${esc(f.field_key)}</code></td>
+        <td>${esc(f.field_label)}</td>
+        <td class="text-xs text-slate-500">${esc(f.field_type)}${f.options?` (${f.options.length})`:''}</td>
+        <td>${f.required?'✓':''}</td>
+        <td class="text-right">${f.display_order}</td>
+        <td><button onclick="del('${f.id}')" class="btn btn-danger">Delete</button></td>
+      </tr>`).join('')
+    : '<tr><td colspan="7" class="text-center py-6 text-slate-400 italic">No fields yet.</td></tr>';
+}
+
+async function add(e) {
+  e.preventDefault();
+  const optsText = document.getElementById('f-options').value.trim();
+  const opts = optsText ? optsText.split('\n').map(s=>s.trim()).filter(Boolean) : null;
+  const csrfTok = await _csrf();
+  const body = {
+    entity_type: document.getElementById('f-entity').value,
+    field_key: document.getElementById('f-key').value.trim().toLowerCase().replace(/\s+/g,'_'),
+    field_label: document.getElementById('f-label').value.trim(),
+    field_type: document.getElementById('f-type').value,
+    options: opts,
+    required: document.getElementById('f-required').checked,
+    display_order: parseInt(document.getElementById('f-order').value || '100'),
+  };
+  const r = await fetch('/api/custom-fields', {method:'POST', headers:{'Content-Type':'application/json','X-CSRF-Token':csrfTok}, body: JSON.stringify(body)});
+  const j = await r.json();
+  if (r.ok) { e.target.reset(); load(); }
+  else alert('✗ ' + (j.error || r.status));
+  return false;
+}
+async function del(id) {
+  if (!confirm('Delete this field? (mark inactive)')) return;
+  const csrfTok = await _csrf();
+  await fetch('/api/custom-fields/' + id, {method:'DELETE', headers:{'X-CSRF-Token':csrfTok}});
+  load();
+}
+load();
+</script>
+</body>
+</html>

@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Error Log — Aspidus CRM</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: Inter, system-ui, sans-serif; background: linear-gradient(180deg,#f8fafc,#eef2f7); min-height:100vh; }
+        .card { background:white; border-radius:14px; border:1px solid #e5e7eb; }
+        .btn { padding: 9px 18px; border-radius: 10px; font-weight: 600; font-size: 13px; transition: all .15s; display:inline-flex; align-items:center; gap:8px; }
+        .btn-ghost { background:#fff; color:#334155; border:1px solid #e5e7eb; }
+        .btn-ghost:hover { background:#f8fafc; }
+        .btn-danger { background:#dc2626; color:white; }
+        .err-item { border-left: 4px solid #ef4444; background:#fef2f2; padding:14px 16px; border-radius:8px; margin-bottom:12px; }
+        .err-meta { font-size:11px; color:#7f1d1d; font-family:ui-monospace,monospace; }
+        .err-msg { color:#7f1d1d; font-weight:600; margin:6px 0; }
+        pre.tb { background:#0f172a; color:#fca5a5; padding:12px; border-radius:8px; font-size:11px; overflow:auto; max-height:280px; font-family:ui-monospace,monospace; margin-top:8px; }
+        .header-icon { width:38px; height:38px; border-radius:10px; background:linear-gradient(135deg,#dc2626,#f97316); color:white; display:inline-flex; align-items:center; justify-content:center; font-size:18px; box-shadow:0 4px 10px rgba(220,38,38,.3); }
+    </style>
+</head>
+<body class="p-6 md:p-8">
+    <div class="max-w-6xl mx-auto">
+        <div class="flex items-center justify-between mb-6">
+            <div class="flex items-center gap-4">
+                <span class="header-icon">🚨</span>
+                <div>
+                    <h1 class="text-2xl font-bold text-slate-900">Error Log</h1>
+                    <p class="text-sm text-slate-500 mt-0.5">Poslednje interne greške sa timestamp-om, request ID-em i traceback-om.</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-2">
+                <button class="btn btn-ghost" onclick="loadErrors()">🔄 Refresh</button>
+                <button class="btn btn-danger" onclick="clearErrors()">🗑 Clear buffer</button>
+                <a href="/admin/supabase" class="btn btn-ghost">← Supabase Admin</a>
+                <a href="/" class="btn btn-ghost">← CRM</a>
+            </div>
+        </div>
+
+        <div class="card p-5">
+            <div id="err-list"><span class="text-sm text-slate-400">Loading...</span></div>
+        </div>
+    </div>
+
+    <script nonce="{{ g.csp_nonce }}">
+        let CSRF = null;
+        async function loadCsrf() { try { const r = await fetch('/api/csrf/token'); const j = await r.json(); CSRF = j.csrf_token; } catch(_) {} }
+
+        function escHtml(s) { return String(s || '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+
+        async function loadErrors() {
+            const el = document.getElementById('err-list');
+            el.innerHTML = '<span class="text-sm text-slate-400">Loading...</span>';
+            try {
+                const r = await fetch('/api/admin/errors?limit=200');
+                const j = await r.json();
+                if (!r.ok) { el.innerHTML = '<div class="text-red-600 text-sm">Error: ' + (j.error || 'unknown') + '</div>'; return; }
+                if (!j.entries || j.entries.length === 0) {
+                    el.innerHTML = '<div class="p-8 text-center text-slate-500"><div class="text-4xl mb-3">🎉</div><div>Nema grešaka u buffer-u.</div></div>';
+                    return;
+                }
+                let html = `<div class="text-xs text-slate-500 mb-3">Prikazano: <b>${j.entries.length}</b> / ukupno ${j.total}</div>`;
+                for (const e of j.entries) {
+                    html += `<div class="err-item">
+                        <div class="err-meta">
+                            <b>${escHtml(e.timestamp)}</b> · ${escHtml(e.context)}
+                            ${e.request_id ? ' · req_id=<code>' + escHtml(e.request_id) + '</code>' : ''}
+                            ${(e.meta && e.meta.method) ? ' · ' + escHtml(e.meta.method) : ''}
+                            ${(e.meta && e.meta.ip) ? ' · ip=' + escHtml(e.meta.ip) : ''}
+                        </div>
+                        <div class="err-msg">${escHtml(e.message)}</div>
+                        ${e.traceback ? '<pre class="tb">' + escHtml(e.traceback) + '</pre>' : ''}
+                    </div>`;
+                }
+                el.innerHTML = html;
+            } catch (e) {
+                el.innerHTML = '<div class="text-red-600 text-sm">Network error: ' + e.message + '</div>';
+            }
+        }
+
+        async function clearErrors() {
+            if (!confirm('Clear all error entries from buffer?')) return;
+            await loadCsrf();
+            const r = await fetch('/api/admin/errors/clear', { method: 'POST', headers: { 'X-CSRF-Token': CSRF || '' } });
+            const j = await r.json();
+            if (r.ok) { alert('Cleared ' + j.cleared + ' entries.'); loadErrors(); }
+            else alert('Error: ' + (j.error || 'unknown'));
+        }
+
+        (async () => { await loadCsrf(); loadErrors(); setInterval(loadErrors, 30000); })();
+    </script>
+</body>
+</html>

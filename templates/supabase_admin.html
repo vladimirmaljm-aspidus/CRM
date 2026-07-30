@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Supabase Migration — Aspidus CRM</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+            background: linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%);
+            min-height: 100vh;
+        }
+        .glass {
+            background: rgba(255,255,255,0.85);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.9);
+            box-shadow: 0 4px 20px rgba(0,0,0,.04), 0 1px 3px rgba(0,0,0,.02);
+        }
+        .card {
+            background: white;
+            border-radius: 14px;
+            border: 1px solid #e5e7eb;
+            transition: box-shadow .2s ease;
+        }
+        .card:hover { box-shadow: 0 4px 20px rgba(0,0,0,.06); }
+        .btn { padding: 9px 18px; border-radius: 10px; font-weight: 600; font-size: 13px; transition: all .15s; display:inline-flex; align-items:center; gap:8px; }
+        .btn-primary { background: linear-gradient(180deg,#2563eb,#1d4ed8); color:white; box-shadow: 0 2px 6px rgba(37,99,235,.3); }
+        .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(37,99,235,.35); }
+        .btn-warn { background: linear-gradient(180deg,#f59e0b,#d97706); color:white; box-shadow: 0 2px 6px rgba(245,158,11,.3); }
+        .btn-warn:hover { transform: translateY(-1px); }
+        .btn-danger { background: linear-gradient(180deg,#ef4444,#dc2626); color:white; }
+        .btn-ghost { background:#fff; color:#334155; border:1px solid #e5e7eb; }
+        .btn-ghost:hover { background:#f8fafc; border-color:#cbd5e1; }
+        .btn:disabled { opacity:.55; cursor:not-allowed; transform:none !important; }
+        pre.log { background: linear-gradient(180deg,#0f172a,#1e293b); color:#e2e8f0; padding:14px; border-radius:10px; font-size:11px; line-height:1.55; overflow:auto; max-height:520px; font-family: ui-monospace, "SF Mono", Monaco, Menlo, monospace; border:1px solid #334155; }
+        .kv { display:flex; justify-content:space-between; align-items:center; padding:9px 0; border-bottom:1px solid #f1f5f9; }
+        .kv:last-child { border-bottom:none; }
+        .kv .k { color:#64748b; font-size:11px; font-weight:600; letter-spacing:.03em; text-transform:uppercase; }
+        .kv .v { font-family: ui-monospace, monospace; font-size:12px; color:#0f172a; font-weight:600; }
+        .badge { padding:3px 10px; border-radius:999px; font-size:10px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; }
+        .badge-green { background:#dcfce7; color:#166534; }
+        .badge-red   { background:#fee2e2; color:#991b1b; }
+        .badge-amber { background:#fef3c7; color:#92400e; }
+        .badge-slate { background:#f1f5f9; color:#475569; }
+        .header-icon { width:38px; height:38px; border-radius:10px; background:linear-gradient(135deg,#2563eb,#7c3aed); color:white; display:inline-flex; align-items:center; justify-content:center; font-size:18px; box-shadow:0 4px 10px rgba(37,99,235,.3); }
+
+        /* MODAL */
+        .modal-overlay { position:fixed; inset:0; background:rgba(15,23,42,.5); backdrop-filter:blur(4px); z-index:50; display:none; align-items:center; justify-content:center; padding:16px; }
+        .modal-overlay.open { display:flex; animation: fadeIn .15s ease; }
+        .modal-box { background:white; border-radius:16px; max-width:480px; width:100%; box-shadow: 0 20px 60px rgba(0,0,0,.25); overflow:hidden; animation: slideUp .18s ease; }
+        @keyframes fadeIn { from { opacity:0 } to { opacity:1 } }
+        @keyframes slideUp { from { transform:translateY(12px); opacity:0 } to { transform:translateY(0); opacity:1 } }
+        .modal-head { padding:20px 24px 8px; }
+        .modal-body { padding:8px 24px 20px; color:#475569; font-size:14px; line-height:1.55; }
+        .modal-actions { padding:14px 24px; background:#f8fafc; border-top:1px solid #e5e7eb; display:flex; justify-content:flex-end; gap:8px; }
+
+        /* TOAST */
+        .toast-wrap { position:fixed; bottom:20px; right:20px; z-index:60; display:flex; flex-direction:column; gap:8px; }
+        .toast { padding:12px 18px; border-radius:10px; box-shadow:0 8px 24px rgba(0,0,0,.15); font-size:13px; font-weight:500; max-width:400px; animation: slideIn .2s ease; }
+        .toast-success { background:#065f46; color:white; }
+        .toast-error { background:#991b1b; color:white; }
+        .toast-info { background:#1e40af; color:white; }
+        @keyframes slideIn { from { transform:translateX(20px); opacity:0 } to { transform:translateX(0); opacity:1 } }
+    </style>
+</head>
+<body class="p-6 md:p-8">
+    <div class="max-w-6xl mx-auto">
+        <!-- HEADER -->
+        <div class="flex items-center justify-between mb-6">
+            <div class="flex items-center gap-4">
+                <span class="header-icon">🚀</span>
+                <div>
+                    <h1 class="text-2xl font-bold text-slate-900">Supabase Migration Control</h1>
+                    <p class="text-sm text-slate-500 mt-0.5">Prelazak sa lokalnog SQLite-a na Supabase Postgres — sve na jednom mestu.</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-2">
+                <a href="/admin/errors" class="btn btn-ghost">📋 Error Log</a>
+                <a href="/" class="btn btn-ghost">← Back to CRM</a>
+            </div>
+        </div>
+
+        <!-- STATUS -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+            <div class="card p-5">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="font-semibold text-slate-900 flex items-center gap-2"><span>📊</span> Feature Flags</h2>
+                    <button class="btn btn-ghost text-xs" onclick="refreshStatus()">🔄 Refresh</button>
+                </div>
+                <div id="flags"><span class="text-sm text-slate-400">Loading…</span></div>
+            </div>
+
+            <div class="card p-5">
+                <h2 class="font-semibold text-slate-900 mb-4 flex items-center gap-2"><span>🔗</span> Supabase Connection</h2>
+                <div id="supabase-conn"><span class="text-sm text-slate-400">Loading…</span></div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+            <div class="card p-5">
+                <h2 class="font-semibold text-slate-900 mb-4 flex items-center gap-2"><span>📦</span> SQLite <span class="text-xs font-normal text-slate-500">(source)</span></h2>
+                <div id="sqlite-counts" class="text-sm"><span class="text-slate-400">Loading…</span></div>
+            </div>
+            <div class="card p-5">
+                <h2 class="font-semibold text-slate-900 mb-4 flex items-center gap-2"><span>☁️</span> Supabase Postgres <span class="text-xs font-normal text-slate-500">(target)</span></h2>
+                <div id="supabase-counts" class="text-sm"><span class="text-slate-400">Loading…</span></div>
+            </div>
+        </div>
+
+        <!-- ACTIONS -->
+        <div class="card p-5 mb-4">
+            <h2 class="font-semibold text-slate-900 mb-4 flex items-center gap-2"><span>🎯</span> Migration Actions</h2>
+            <div class="flex flex-wrap gap-3 mb-4">
+                <button class="btn btn-ghost" onclick="dryRun()" id="btn-dry">🧪 Dry-Run (safe, just counts)</button>
+                <button class="btn btn-primary" onclick="startMigration()" id="btn-migrate">▶ Start Full Migration</button>
+                <button class="btn btn-warn" onclick="toggleFlag('USE_SUPABASE_DB')" id="btn-flag-db">Toggle USE_SUPABASE_DB</button>
+                <button class="btn btn-warn" onclick="toggleFlag('DUAL_WRITE_MODE')" id="btn-flag-dw">Toggle DUAL_WRITE_MODE</button>
+            </div>
+            <div class="rounded-xl bg-slate-50 border border-slate-200 p-4 text-xs text-slate-600 leading-relaxed">
+                <strong class="text-slate-800">Preporučen redosled:</strong>
+                1) Dry-Run da vidiš brojeve. 2) Start Full Migration. 3) Kad završi bez grešaka,
+                Toggle DUAL_WRITE_MODE (piše u oba). 4) Sačekaj par sati / dana da si siguran.
+                5) Toggle USE_SUPABASE_DB (Supabase postaje glavni). 6) Kad si potpuno siguran,
+                obriši DUAL_WRITE_MODE. Za trajno menjanje flag-ova, editovaj <code class="bg-white px-1.5 py-0.5 rounded border border-slate-200">.env</code>.
+            </div>
+        </div>
+
+        <!-- MIGRATION LOG / PROGRESS -->
+        <div class="card p-5 mb-4">
+            <div class="flex items-center justify-between mb-3">
+                <h2 class="font-semibold text-slate-900 flex items-center gap-2"><span>📜</span> Migration Log</h2>
+                <div id="migration-status"><span class="badge badge-amber">idle</span></div>
+            </div>
+            <pre class="log" id="migration-log">-- (no migration run yet) --</pre>
+        </div>
+
+        <!-- FAZA 2: SUPABASE STORAGE -->
+        <div class="card p-5 mb-4">
+            <div class="flex items-center justify-between mb-3">
+                <h2 class="font-semibold text-slate-900 flex items-center gap-2"><span>📁</span> Supabase Storage <span class="text-xs font-normal text-slate-500">(Faza 2)</span></h2>
+                <div class="flex gap-2">
+                    <button class="btn btn-ghost" onclick="refreshStorage()">🔄 Refresh</button>
+                    <button class="btn btn-primary" onclick="initStorageBuckets()" id="btn-init-storage">✨ Init Buckets</button>
+                </div>
+            </div>
+            <div class="rounded-xl bg-slate-50 border border-slate-200 p-4 text-xs text-slate-600 leading-relaxed mb-3">
+                <strong class="text-slate-800">Init Buckets</strong> idempotentno kreira <code class="bg-white px-1.5 py-0.5 rounded border">partner-docs</code>,
+                <code class="bg-white px-1.5 py-0.5 rounded border">offer-pdfs</code> i <code class="bg-white px-1.5 py-0.5 rounded border">portal-uploads</code>
+                kao private bucket-ove. Sme se pozvati vise puta bez efekta. Prvo ukljuci <code class="bg-white px-1.5 py-0.5 rounded border">USE_SUPABASE_STORAGE</code>.
+            </div>
+            <div id="storage-status"><span class="text-sm text-slate-400">Click Refresh to load bucket status…</span></div>
+        </div>
+
+        <!-- OPERATIONS CENTER: Auth Sync, Reconcile, Sync-Back -->
+        <div class="card p-5 mb-4">
+            <div class="flex items-center justify-between mb-3">
+                <h2 class="font-semibold text-slate-900 flex items-center gap-2"><span>⚙️</span> Operations Center</h2>
+                <a href="/admin/mail-queue" class="text-xs text-indigo-600 hover:underline">→ Mail Queue</a>
+            </div>
+            <div class="rounded-xl bg-slate-50 border border-slate-200 p-4 text-xs text-slate-600 leading-relaxed mb-3">
+                <strong class="text-slate-800">Šta ovo radi:</strong>
+                <ul class="list-disc pl-4 mt-1 space-y-0.5">
+                    <li><b>Auth Sync</b> — uparuje Supabase Auth users sa lokalnim partners (repair za propustene webhook-ove).</li>
+                    <li><b>Reconcile</b> — poredi row count u SQLite vs Supabase Postgres i prikazuje drift.</li>
+                    <li><b>Sync-Back</b> — kopira Supabase-only redove (napr. iz Dashboard-a) nazad u SQLite.</li>
+                </ul>
+            </div>
+            <div class="flex flex-wrap gap-2 mb-3">
+                <button class="btn btn-primary" onclick="runAuthSync()" id="btn-auth-sync">🔗 Auth Sync</button>
+                <button class="btn btn-ghost" onclick="runReconcile()" id="btn-reconcile">📊 Reconcile</button>
+                <button class="btn btn-warn" onclick="runSyncBack(true)" id="btn-syncback-dry">↻ Sync-Back (dry-run)</button>
+            </div>
+            <div id="ops-output" class="text-xs"></div>
+        </div>
+    </div>
+
+    <!-- IN-APP MODAL (za confirm / alert / prompt) -->
+    <div class="modal-overlay" id="app-modal">
+        <div class="modal-box">
+            <div class="modal-head">
+                <h3 class="text-lg font-semibold text-slate-900" id="am-title">Confirm</h3>
+            </div>
+            <div class="modal-body" id="am-body"></div>
+            <div class="modal-actions">
+                <button class="btn btn-ghost" id="am-cancel">Cancel</button>
+                <button class="btn btn-primary" id="am-ok">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- TOAST HOST -->
+    <div class="toast-wrap" id="toast-host"></div>
+
+    <script nonce="{{ g.csp_nonce }}">
+        // ==============================================
+        //  In-app modal + toast (menja native alert/confirm/prompt)
+        // ==============================================
+        function toast(msg, kind='info', ms=4200){
+            const host = document.getElementById('toast-host');
+            const el = document.createElement('div');
+            el.className = 'toast toast-' + kind;
+            el.textContent = msg;
+            host.appendChild(el);
+            setTimeout(() => { el.style.opacity='0'; setTimeout(()=>el.remove(), 250); }, ms);
+        }
+        function appModal({ title, body, okText='OK', cancelText='Cancel', hideCancel=false, input=null }) {
+            return new Promise(resolve => {
+                const box = document.getElementById('app-modal');
+                document.getElementById('am-title').textContent = title;
+                const b = document.getElementById('am-body');
+                b.innerHTML = '';
+                if (typeof body === 'string') b.innerHTML = body;
+                let inputEl = null;
+                if (input) {
+                    inputEl = document.createElement('input');
+                    inputEl.type = input.type || 'text';
+                    inputEl.className = 'mt-3 w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm';
+                    inputEl.placeholder = input.placeholder || '';
+                    if (input.value) inputEl.value = input.value;
+                    b.appendChild(inputEl);
+                }
+                document.getElementById('am-ok').textContent = okText;
+                document.getElementById('am-cancel').textContent = cancelText;
+                document.getElementById('am-cancel').style.display = hideCancel ? 'none' : '';
+                box.classList.add('open');
+                if (inputEl) setTimeout(() => inputEl.focus(), 60);
+                const cleanup = () => { box.classList.remove('open'); document.getElementById('am-ok').onclick = null; document.getElementById('am-cancel').onclick = null; };
+                document.getElementById('am-ok').onclick = () => { const val = inputEl ? inputEl.value : true; cleanup(); resolve(val); };
+                document.getElementById('am-cancel').onclick = () => { cleanup(); resolve(null); };
+                if (inputEl) inputEl.addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('am-ok').click(); });
+            });
+        }
+
+        // ==============================================
+        //  CSRF token setup — svaki fetch šalje X-CSRF-Token
+        // ==============================================
+        let CSRF_TOKEN = null;
+        async function loadCsrf() {
+            try {
+                const r = await fetch('/api/csrf/token');
+                const j = await r.json();
+                CSRF_TOKEN = j.csrf_token || null;
+            } catch(_) {}
+        }
+        async function api(url, opts={}) {
+            if (!CSRF_TOKEN && !['GET','HEAD','OPTIONS'].includes((opts.method || 'GET').toUpperCase())) {
+                await loadCsrf();
+            }
+            const headers = Object.assign({ 'Content-Type': 'application/json' }, opts.headers || {});
+            if (CSRF_TOKEN) headers['X-CSRF-Token'] = CSRF_TOKEN;
+            return fetch(url, Object.assign({}, opts, { headers }));
+        }
+
+        // ==============================================
+        //  Status + actions
+        // ==============================================
+        let pollTimer = null;
+
+        async function refreshStatus() {
+            try {
+                const res = await api('/api/supabase/status');
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                const s = await res.json();
+
+                let flagHtml = '';
+                for (const [k, v] of Object.entries(s.flags)) {
+                    const isOn = ['true', '1', 'yes', 'on'].includes(String(v).toLowerCase());
+                    flagHtml += `<div class="kv"><span class="k">${k}</span><span class="v">
+                        <span class="badge ${isOn ? 'badge-green' : 'badge-slate'}">${v}</span>
+                    </span></div>`;
+                }
+                document.getElementById('flags').innerHTML = flagHtml;
+
+                const sb = s.supabase;
+                let connHtml = `
+                    <div class="kv"><span class="k">Connection</span><span class="v">
+                        <span class="badge ${sb.connection_ok ? 'badge-green' : 'badge-red'}">
+                            ${sb.connection_ok ? 'OK' : 'FAIL'}
+                        </span>
+                    </span></div>
+                    <div class="kv"><span class="k">Backend</span><span class="v">${sb.backend || '—'}</span></div>
+                    <div class="kv"><span class="k">Auth Admin API</span><span class="v">
+                        <span class="badge ${sb.auth_ok ? 'badge-green' : 'badge-slate'}">${sb.auth_ok ? 'OK' : (sb.auth_users || 'off')}</span>
+                    </span></div>
+                    ${sb.error ? `<div class="kv"><span class="k">Error</span><span class="v text-red-600" style="font-size:11px">${sb.error}</span></div>` : ''}
+                `;
+                document.getElementById('supabase-conn').innerHTML = connHtml;
+
+                let sqliteHtml = '';
+                for (const k of Object.keys(s.sqlite_counts).sort()) {
+                    sqliteHtml += `<div class="kv"><span class="k">${k}</span><span class="v">${s.sqlite_counts[k]}</span></div>`;
+                }
+                document.getElementById('sqlite-counts').innerHTML = sqliteHtml || '<span class="text-slate-400">No data</span>';
+
+                let supaHtml = '';
+                for (const k of Object.keys(sb.counts || {}).sort()) {
+                    supaHtml += `<div class="kv"><span class="k">${k}</span><span class="v">${sb.counts[k]}</span></div>`;
+                }
+                document.getElementById('supabase-counts').innerHTML = supaHtml || '<span class="text-slate-400">No data</span>';
+
+                const m = s.migration;
+                let statusBadge = '<span class="badge badge-slate">idle</span>';
+                if (m.running) statusBadge = '<span class="badge badge-green">RUNNING</span>';
+                else if (m.error) statusBadge = '<span class="badge badge-red">ERROR</span>';
+                else if (m.finished_at) statusBadge = '<span class="badge badge-green">completed</span>';
+                document.getElementById('migration-status').innerHTML = statusBadge;
+
+                if (m.log && m.log.length) {
+                    document.getElementById('migration-log').textContent = m.log.join('\n');
+                }
+
+                document.getElementById('btn-migrate').disabled = m.running;
+                document.getElementById('btn-dry').disabled = m.running;
+
+                if (m.running && !pollTimer) { pollTimer = setInterval(refreshStatus, 3000); }
+                else if (!m.running && pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+            } catch (e) {
+                document.getElementById('flags').innerHTML = '<span class="text-red-600 text-sm">Error: ' + e.message + '</span>';
+            }
+        }
+
+        async function dryRun() {
+            const btn = document.getElementById('btn-dry');
+            btn.disabled = true; btn.textContent = '⏳ Running dry-run...';
+            try {
+                const res = await api('/api/supabase/dry-run', { method: 'POST' });
+                const data = await res.json();
+                if (res.ok) {
+                    document.getElementById('migration-log').textContent = data.output || '(empty output)';
+                    toast('Dry-run finished.', 'success');
+                } else {
+                    toast('Dry-run error: ' + (data.error || 'HTTP ' + res.status), 'error', 6000);
+                }
+            } catch (e) { toast('Network error: ' + e.message, 'error'); }
+            btn.disabled = false; btn.textContent = '🧪 Dry-Run (safe, just counts)';
+        }
+
+        async function startMigration() {
+            const ok = await appModal({
+                title: 'Start Full Migration?',
+                body: 'This will <b>UPSERT</b> all rows from SQLite into Supabase Postgres.<br><br>Safe to re-run — existing rows get overwritten with SQLite version by id. Runs in background, page auto-refreshes.',
+                okText: 'Yes, start migration',
+            });
+            if (!ok) return;
+            try {
+                const res = await api('/api/supabase/migrate', { method: 'POST' });
+                const data = await res.json();
+                if (res.ok) {
+                    document.getElementById('migration-log').textContent = 'Migration started... polling for updates.';
+                    toast('Migration started in background.', 'success');
+                    refreshStatus();
+                } else {
+                    toast('Migration error: ' + (data.error || 'Unknown'), 'error');
+                }
+            } catch (e) { toast('Network error.', 'error'); }
+        }
+
+        async function toggleFlag(flag) {
+            const curBadge = document.querySelector('#flags').textContent.match(new RegExp(flag + '\\s*([a-z01]+)', 'i'));
+            const currentIsOn = curBadge && /true|1|yes|on/i.test(curBadge[1]);
+            const newVal = currentIsOn ? 'false' : 'true';
+            const ok = await appModal({
+                title: `Toggle ${flag}?`,
+                body: `Current: <b>${currentIsOn ? 'true' : 'false'}</b> → New: <b>${newVal}</b><br><br>⚠ This changes the flag in the <b>running process only</b>. For permanent change, edit <code>.env</code> on server and Reload web app.`,
+                okText: `Set to ${newVal}`,
+            });
+            if (!ok) return;
+            try {
+                const res = await api('/api/supabase/set-flag', {
+                    method: 'POST',
+                    body: JSON.stringify({ flag, value: newVal })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    toast(`${flag}: ${data.old} → ${data.new}`, 'success');
+                    refreshStatus();
+                } else {
+                    toast('Error: ' + (data.error || 'Unknown'), 'error');
+                }
+            } catch (e) { toast('Network error.', 'error'); }
+        }
+
+        // ==========================================================
+        //  FAZA 2: STORAGE bucket management
+        // ==========================================================
+
+        async function initStorageBuckets() {
+            const ok = await appModal({
+                title: 'Initialize Storage buckets?',
+                body: 'This will idempotently create <code>partner-docs</code>, <code>offer-pdfs</code>, and <code>portal-uploads</code> as <b>private</b> buckets in your Supabase project. Safe to run multiple times.<br><br>Requires <code>USE_SUPABASE_STORAGE=true</code>.',
+                okText: 'Init Buckets',
+            });
+            if (!ok) return;
+            const btn = document.getElementById('btn-init-storage');
+            btn.disabled = true; btn.textContent = '⏳ Working…';
+            try {
+                const res = await api('/api/supabase/storage/init', { method: 'POST' });
+                const data = await res.json();
+                if (res.ok && data.ok) {
+                    const cr = (data.created || []).length;
+                    const sk = (data.skipped || []).length;
+                    toast(`✓ Storage ready — created: ${cr}, existed: ${sk}`, 'success');
+                    refreshStorage();
+                } else {
+                    toast('✗ ' + (data.error || 'Init failed'), 'error');
+                    if (data.hint) toast(data.hint, 'info');
+                }
+            } catch (e) {
+                toast('Network error initializing storage.', 'error');
+            } finally {
+                btn.disabled = false; btn.textContent = '✨ Init Buckets';
+            }
+        }
+
+        async function refreshStorage() {
+            const holder = document.getElementById('storage-status');
+            holder.innerHTML = '<span class="text-sm text-slate-400">⏳ Loading bucket status…</span>';
+            try {
+                const res = await fetch('/api/supabase/storage/status');
+                const data = await res.json();
+                if (!data.enabled) {
+                    holder.innerHTML = `<div class="rounded-lg bg-amber-50 border border-amber-200 p-3 text-xs text-amber-900">
+                        <b>Storage is disabled.</b> Turn on <code>USE_SUPABASE_STORAGE</code> to enable cloud storage.
+                    </div>`;
+                    return;
+                }
+                if (!data.ok) {
+                    holder.innerHTML = `<div class="rounded-lg bg-red-50 border border-red-200 p-3 text-xs text-red-800">
+                        <b>Error:</b> ${(data.error || 'unknown').toString().replace(/</g,'&lt;')}
+                    </div>`;
+                    return;
+                }
+                let html = '<div class="grid grid-cols-1 md:grid-cols-3 gap-3">';
+                for (const b of (data.buckets || [])) {
+                    const badge = b.exists
+                        ? '<span class="badge badge-green">exists</span>'
+                        : '<span class="badge badge-slate">missing</span>';
+                    let recentList = '';
+                    if (b.recent && b.recent.length) {
+                        recentList = '<ul class="mt-2 text-xs text-slate-500 space-y-0.5">'
+                            + b.recent.map(r => `<li class="truncate">• ${(r.name||'').replace(/</g,'&lt;')} <span class="text-slate-400">(${Math.round((r.size||0)/1024)} kB)</span></li>`).join('')
+                            + '</ul>';
+                    }
+                    html += `<div class="rounded-xl border border-slate-200 p-3 bg-white">
+                        <div class="flex items-center justify-between mb-1">
+                            <b class="text-sm text-slate-900">${b.name}</b>
+                            ${badge}
+                        </div>
+                        <div class="text-xs text-slate-500">Files: <b class="text-slate-800">${b.file_count || 0}</b></div>
+                        ${recentList}
+                        ${b.error ? `<div class="text-xs text-red-600 mt-1">${b.error.replace(/</g,'&lt;')}</div>` : ''}
+                    </div>`;
+                }
+                html += '</div>';
+                holder.innerHTML = html;
+            } catch (e) {
+                holder.innerHTML = `<div class="text-xs text-red-600">Network error: ${e.message}</div>`;
+            }
+        }
+
+        // ==========================================================
+        //  OPERATIONS CENTER handlers
+        // ==========================================================
+        async function runAuthSync() {
+            const btn = document.getElementById('btn-auth-sync');
+            const out = document.getElementById('ops-output');
+            btn.disabled = true; btn.textContent = '⏳ Syncing…';
+            out.innerHTML = '<div class="text-slate-400">Fetching Supabase Auth users…</div>';
+            try {
+                const res = await api('/api/admin/supabase-auth/sync', { method: 'POST' });
+                const data = await res.json();
+                if (!res.ok || !data.ok) { toast('✗ ' + (data.error || 'Failed'), 'error'); out.innerHTML = ''; return; }
+                const s = data.summary || {};
+                out.innerHTML = `<div class="rounded-lg bg-emerald-50 border border-emerald-200 p-3">
+                    <b>✓ Auth sync complete.</b> Matched: <b>${s.matched}</b>, orphan Auth users (no partner): <b>${s.missing_partner}</b>, errors: <b>${s.errors}</b>.
+                </div>`;
+                toast(`✓ ${s.matched} matched, ${s.missing_partner} orphan.`, 'success');
+            } catch (e) { toast('Network error: ' + e.message, 'error'); }
+            finally { btn.disabled = false; btn.textContent = '🔗 Auth Sync'; }
+        }
+
+        async function runReconcile() {
+            const btn = document.getElementById('btn-reconcile');
+            const out = document.getElementById('ops-output');
+            btn.disabled = true; btn.textContent = '⏳ Counting…';
+            out.innerHTML = '<div class="text-slate-400">Reconciling row counts across all tables…</div>';
+            try {
+                const res = await api('/api/supabase/reconcile', { method: 'POST' });
+                const data = await res.json();
+                if (!res.ok || !data.ok) { toast('✗ ' + (data.error || 'Failed'), 'error'); out.innerHTML = ''; return; }
+                const rows = data.results || [];
+                const html = `<div class="rounded-lg border border-slate-200 overflow-hidden">
+                    <table class="w-full text-xs">
+                        <thead class="bg-slate-50"><tr>
+                            <th class="p-2 text-left">Table</th><th class="p-2 text-right">SQLite</th>
+                            <th class="p-2 text-right">Supabase</th><th class="p-2 text-left">Status</th>
+                        </tr></thead>
+                        <tbody>${rows.map(r => {
+                            const badge = r.status === 'ok' ? '<span class="badge badge-green">OK</span>'
+                                : r.status === 'sp_error' ? '<span class="badge badge-red">SP error</span>'
+                                : '<span class="badge badge-amber">DRIFT</span>';
+                            return `<tr class="border-t border-slate-100">
+                                <td class="p-2 font-mono">${r.source_table}</td>
+                                <td class="p-2 text-right">${r.sqlite_count ?? '—'}</td>
+                                <td class="p-2 text-right">${r.supabase_count ?? '—'}</td>
+                                <td class="p-2">${badge}</td>
+                            </tr>`;
+                        }).join('')}</tbody>
+                    </table></div>
+                    <div class="text-xs mt-2 ${data.drift ? 'text-amber-700' : 'text-emerald-700'}">
+                        ${data.drift ? '⚠ Drift detected. Consider Sync-Back or Migration.' : '✓ All tables aligned.'}
+                    </div>`;
+                out.innerHTML = html;
+                toast(data.drift ? '⚠ Drift detected' : '✓ Aligned', data.drift ? 'warn' : 'success');
+            } catch (e) { toast('Network error: ' + e.message, 'error'); }
+            finally { btn.disabled = false; btn.textContent = '📊 Reconcile'; }
+        }
+
+        async function runSyncBack(dryRun) {
+            if (!dryRun) {
+                const ok = await appModal({
+                    title: 'Sync-Back (COMMIT)',
+                    body: 'Ovo ce <b>zaista upisati</b> Supabase-only redove u lokalnu SQLite bazu. UPSERT po id (idempotent). Pokreni <b>dry-run prvo</b> da vidis sta ce se desiti.',
+                    okText: 'Yes, sync back',
+                });
+                if (!ok) return;
+            }
+            const btn = document.getElementById('btn-syncback-dry');
+            const out = document.getElementById('ops-output');
+            btn.disabled = true; btn.textContent = '⏳ Working…';
+            out.innerHTML = '<div class="text-slate-400">Fetching Supabase IDs and comparing…</div>';
+            try {
+                const res = await api('/api/supabase/sync-back', {
+                    method: 'POST',
+                    body: JSON.stringify({ confirm: !dryRun })
+                });
+                const data = await res.json();
+                if (!res.ok || !data.ok) { toast('✗ ' + (data.error || 'Failed'), 'error'); out.innerHTML = ''; return; }
+                const rows = data.results || [];
+                out.innerHTML = `<div class="rounded-lg border border-slate-200 p-3 text-xs">
+                    <b>${dryRun ? 'DRY-RUN' : 'COMMITTED'}:</b> Total ${dryRun ? 'to sync' : 'synced'}: <b>${data.total_pushed || 0}</b>
+                    ${data.total_errors ? `, errors: <b class="text-red-600">${data.total_errors}</b>` : ''}
+                    <ul class="mt-2 space-y-1">
+                        ${rows.map(r => `<li>${r.source_table} → ${r.n_pushed} rows${r.errors?.length ? ` (<span class="text-red-600">${r.errors.length} errors</span>)` : ''}</li>`).join('')}
+                    </ul>
+                    ${dryRun ? '<div class="mt-3"><button class="btn btn-warn small" onclick="runSyncBack(false)">Confirm & sync back for real</button></div>' : ''}
+                </div>`;
+                toast(dryRun ? `↻ Would sync ${data.total_pushed} rows` : `✓ Synced ${data.total_pushed} rows`, 'success');
+            } catch (e) { toast('Network error: ' + e.message, 'error'); }
+            finally { btn.disabled = false; btn.textContent = '↻ Sync-Back (dry-run)'; }
+        }
+        window.runSyncBack = runSyncBack;
+
+        (async () => {
+            await loadCsrf();
+            await refreshStatus();
+            refreshStorage();  // auto-load Storage panel odmah
+            setInterval(() => { if (!pollTimer) refreshStatus(); }, 15000);
+        })();
+    </script>
+</body>
+</html>

@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Permissions Matrix — Aspidus CRM</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body { font-family: Inter, ui-sans-serif, system-ui, sans-serif; background: linear-gradient(180deg,#f8fafc,#eef2f7); min-height:100vh; }
+  .card { background:white; border-radius:14px; border:1px solid #e5e7eb; }
+  .btn { padding:6px 12px; border-radius:8px; font-weight:600; font-size:12px; cursor:pointer; transition:.15s; }
+  .btn-primary { background:linear-gradient(135deg,#4f46e5,#7c3aed); color:white; }
+  .btn-ghost { background:white; color:#334155; border:1px solid #e5e7eb; }
+  .badge { display:inline-block; padding:2px 8px; border-radius:99px; font-size:10px; font-weight:700; text-transform:uppercase; }
+  .badge-admin { background:#fef3c7; color:#92400e; }
+  .badge-user { background:#dbeafe; color:#1e40af; }
+</style>
+</head>
+<body class="p-6 md:p-8">
+<div class="max-w-7xl mx-auto">
+  <div class="flex items-center justify-between mb-6">
+    <div class="flex items-center gap-3">
+      <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white flex items-center justify-center text-xl shadow">🔒</div>
+      <div>
+        <h1 class="text-2xl font-bold text-slate-900">Permissions Matrix</h1>
+        <p class="text-xs text-slate-500 mt-0.5">Toggle features per user. Admin role gets everything automatically.</p>
+      </div>
+    </div>
+    <a href="/" class="btn btn-ghost">← CRM</a>
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-4 gap-4">
+    <div class="card p-4 lg:col-span-1">
+      <b class="text-slate-900 text-sm uppercase tracking-widest">Users</b>
+      <input id="user-search" placeholder="Search…" class="mt-3 w-full text-xs px-3 py-2 border rounded-lg">
+      <div id="user-list" class="mt-3 space-y-1 text-sm text-slate-500">⏳ Loading…</div>
+    </div>
+    <div class="card p-5 lg:col-span-3" id="matrix">
+      <div class="text-slate-400 text-sm text-center py-16">
+        Select a user to view/edit their permissions.
+      </div>
+    </div>
+  </div>
+</div>
+
+<script nonce="{{ g.csp_nonce }}">
+let csrf='', catalog=null, users=[], selectedId=null;
+async function _csrf(){ if(csrf)return csrf; csrf=(await(await fetch('/api/csrf/token')).json()).csrf_token||''; return csrf; }
+function esc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));}
+
+async function boot() {
+  const [c, u] = await Promise.all([
+    fetch('/api/admin/permissions/catalog').then(r=>r.json()),
+    fetch('/api/admin/permissions/users').then(r=>r.json()),
+  ]);
+  catalog = c.groups || {};
+  users = u.users || [];
+  renderUsers();
+}
+function renderUsers() {
+  const q = (document.getElementById('user-search').value||'').toLowerCase();
+  const filtered = users.filter(u => !q || u.username.toLowerCase().includes(q) || (u.full_name||'').toLowerCase().includes(q));
+  document.getElementById('user-list').innerHTML = filtered.map(u => `
+    <button onclick="pick('${u.id}')" class="w-full text-left px-3 py-2 rounded-lg hover:bg-indigo-50 border ${u.id===selectedId?'border-indigo-400 bg-indigo-50':'border-slate-200'}">
+      <div class="flex items-center justify-between">
+        <b class="text-slate-900 truncate">${esc(u.username)}</b>
+        <span class="badge ${u.role==='admin'?'badge-admin':'badge-user'}">${esc(u.role)}</span>
+      </div>
+      <div class="text-[10px] text-slate-400 truncate">${esc(u.full_name||u.email||'—')}</div>
+    </button>
+  `).join('') || '<div class="text-slate-400 italic text-xs">No users match.</div>';
+}
+document.getElementById('user-search').addEventListener('input', renderUsers);
+
+function pick(uid) {
+  selectedId = uid;
+  renderUsers();
+  const u = users.find(x=>x.id===uid);
+  if (!u) return;
+  const isAdmin = u.role==='admin';
+  const perms = u.permissions || {};
+  const groups = Object.entries(catalog).map(([g, keys]) => {
+    const rows = keys.map(k => `
+      <label class="flex items-start gap-2 py-1.5 border-b border-slate-100 hover:bg-slate-50 px-2 rounded">
+        <input type="checkbox" data-key="${esc(k.key)}" ${isAdmin?'checked disabled':(perms[k.key]?'checked':'')} class="mt-0.5">
+        <div class="flex-1">
+          <div class="text-xs font-mono text-slate-700">${esc(k.key)}</div>
+          <div class="text-xs text-slate-500">${esc(k.description)}</div>
+        </div>
+      </label>
+    `).join('');
+    return `<div class="mb-4">
+      <div class="text-xs font-bold uppercase tracking-widest text-slate-600 mb-2">${esc(g)}</div>
+      ${rows}
+    </div>`;
+  }).join('');
+  document.getElementById('matrix').innerHTML = `
+    <div class="flex items-center justify-between mb-4">
+      <div>
+        <b class="text-slate-900 text-base">${esc(u.username)}</b>
+        <span class="badge ${isAdmin?'badge-admin':'badge-user'} ml-2">${esc(u.role)}</span>
+        <div class="text-xs text-slate-500 mt-0.5">${esc(u.full_name||u.email||'—')}</div>
+      </div>
+      ${isAdmin?'<span class="text-xs text-amber-700 bg-amber-50 px-3 py-1.5 rounded-lg">Admin has all permissions by role.</span>':`
+        <div class="flex gap-2">
+          <button class="btn btn-ghost" onclick="toggleAll(true)">✓ All</button>
+          <button class="btn btn-ghost" onclick="toggleAll(false)">✗ None</button>
+          <button class="btn btn-primary" onclick="save()">💾 Save</button>
+        </div>
+      `}
+    </div>
+    ${groups}
+  `;
+}
+function toggleAll(v) {
+  document.querySelectorAll('#matrix input[type=checkbox]:not(:disabled)').forEach(c => c.checked = v);
+}
+async function save() {
+  const perms = {};
+  document.querySelectorAll('#matrix input[type=checkbox]:not(:disabled)').forEach(c => {
+    perms[c.dataset.key] = c.checked;
+  });
+  const csrfTok = await _csrf();
+  const r = await fetch(`/api/admin/permissions/user/${selectedId}`, {
+    method:'POST', headers:{'Content-Type':'application/json','X-CSRF-Token':csrfTok},
+    body: JSON.stringify({ permissions: perms })
+  });
+  const j = await r.json();
+  if (r.ok) {
+    alert(`✓ Saved ${j.saved_keys} permission keys. All ${users.find(x=>x.id===selectedId).username}'s sessions were invalidated.`);
+    boot();
+  } else alert('✗ ' + (j.error || r.status));
+}
+boot();
+</script>
+</body>
+</html>

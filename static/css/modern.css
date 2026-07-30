@@ -1,0 +1,671 @@
+/* =========================================
+   ASPIDUS — MODERN DESIGN LAYER v2
+   ========================================= */
+/* Inspiracija: ERPNext, NocoBase, Linear, Vercel.
+ * Ovaj fajl se učitava POSLE style.css i dopunjuje/nadograđuje
+ * postojeći sistem sa boljim tokenima, gradient akcentima,
+ * modernim komponentama.
+ */
+
+:root {
+  /* Nova, sofisticiranija paleta */
+  --brand-primary: #4f46e5;      /* indigo — dublje, ne "korporativno" plavi */
+  --brand-primary-hover: #4338ca;
+  --brand-secondary: #7c3aed;    /* purple akcenat */
+  --brand-gradient: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+  --brand-gradient-soft: linear-gradient(135deg, #eef2ff 0%, #f5f3ff 100%);
+
+  /* Neutralne — više nivoa slate/gray */
+  --n-50:  #f8fafc;
+  --n-100: #f1f5f9;
+  --n-200: #e2e8f0;
+  --n-300: #cbd5e1;
+  --n-400: #94a3b8;
+  --n-500: #64748b;
+  --n-600: #475569;
+  --n-700: #334155;
+  --n-800: #1e293b;
+  --n-900: #0f172a;
+
+  /* Modern shadow sistem — sofisticiraniji */
+  --sh-1: 0 1px 2px 0 rgba(15,23,42,.04);
+  --sh-2: 0 2px 8px -1px rgba(15,23,42,.08), 0 1px 3px rgba(15,23,42,.05);
+  --sh-3: 0 8px 24px -6px rgba(15,23,42,.12), 0 4px 8px -2px rgba(15,23,42,.06);
+  --sh-4: 0 20px 40px -12px rgba(15,23,42,.18), 0 8px 16px -4px rgba(15,23,42,.08);
+  --sh-glow: 0 0 0 4px rgba(79,70,229,.15);
+  --sh-brand: 0 4px 12px -2px rgba(79,70,229,.35);
+}
+
+/* =========================================
+   TIPOGRAFIJA — modernije, tighter
+   ========================================= */
+body {
+  font-family: 'Inter', 'SF Pro Display', system-ui, -apple-system, sans-serif;
+  font-feature-settings: 'cv02','cv03','cv04','cv11','ss01','ss03';
+  letter-spacing: -0.011em;
+}
+h1, h2, h3, h4, h5, h6 {
+  letter-spacing: -0.02em;
+  font-weight: 650;
+}
+
+/* =========================================
+   SIDEBAR — moderna, sofisticirana
+   ========================================= */
+aside {
+  background: linear-gradient(180deg, #ffffff 0%, #fafbfc 100%) !important;
+  border-right: 1px solid var(--n-200);
+  box-shadow: 1px 0 0 rgba(15,23,42,.02);
+}
+
+/* Sekcijska podela u sidebaru — dodaje se kroz JS */
+.sidebar-section {
+  padding: 16px 12px 4px;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--n-400);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* Sidebar linkovi — glađi hover, aktivni link */
+aside nav button,
+aside nav a {
+  border-radius: 10px;
+  transition: all .18s cubic-bezier(.4,0,.2,1);
+  position: relative;
+  font-weight: 500;
+}
+aside nav button:hover,
+aside nav a:hover {
+  background: linear-gradient(90deg, #eef2ff 0%, #f5f3ff 100%) !important;
+  color: var(--brand-primary) !important;
+  transform: translateX(2px);
+}
+aside nav button.active,
+aside nav a.active,
+aside nav [data-active="true"] {
+  background: var(--brand-gradient) !important;
+  color: white !important;
+  box-shadow: var(--sh-brand);
+}
+aside nav button.active svg,
+aside nav a.active svg {
+  color: white !important;
+}
+/* Levi akcent na hover — subtle */
+aside nav button::before,
+aside nav a::before {
+  content: '';
+  position: absolute;
+  left: -12px;
+  top: 6px;
+  bottom: 6px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--brand-gradient);
+  opacity: 0;
+  transition: opacity .18s;
+}
+aside nav button.active::before,
+aside nav a.active::before {
+  opacity: 1;
+}
+
+/* Sidebar sekcije razmak */
+.nav-section {
+  margin-top: 18px;
+  border-top: 1px solid var(--n-100);
+  padding-top: 8px;
+}
+.nav-section:first-of-type {
+  margin-top: 0;
+  border-top: none;
+  padding-top: 0;
+}
+
+/* =========================================
+   KARTICE / PANELI — glass i moderni
+   ========================================= */
+.card,
+.bg-\[var\(--panel\)\],
+.bg-\[var\(--card\)\] {
+  border-radius: 14px !important;
+  border: 1px solid var(--n-200) !important;
+  box-shadow: var(--sh-1);
+  transition: box-shadow .2s ease, transform .18s cubic-bezier(.4,0,.2,1);
+}
+.card:hover {
+  box-shadow: var(--sh-2);
+}
+
+/* Header sekcije unutar kartica */
+.section-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--n-500);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin-bottom: 12px;
+}
+
+/* =========================================
+   DUGMAD — moderno, sa gradient primarnim
+   ========================================= */
+.btn-primary,
+button[class*="bg-blue-6"],
+button[class*="bg-indigo"] {
+  background: var(--brand-gradient) !important;
+  color: white !important;
+  border: none !important;
+  border-radius: 10px !important;
+  padding: 9px 18px !important;
+  font-weight: 600;
+  font-size: 13px;
+  box-shadow: var(--sh-brand);
+  transition: all .18s;
+}
+.btn-primary:hover,
+button[class*="bg-blue-6"]:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px -3px rgba(79,70,229,.45);
+}
+.btn-primary:active {
+  transform: translateY(0);
+}
+
+/* Sekundarna dugmad */
+.btn-secondary {
+  background: white !important;
+  color: var(--n-700) !important;
+  border: 1px solid var(--n-200) !important;
+  border-radius: 10px !important;
+  padding: 8px 16px !important;
+  font-weight: 500;
+  transition: all .18s;
+}
+.btn-secondary:hover {
+  background: var(--n-50) !important;
+  border-color: var(--n-300) !important;
+}
+
+/* =========================================
+   TABELE — modernije
+   ========================================= */
+table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+thead th {
+  background: var(--n-50) !important;
+  color: var(--n-500) !important;
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--n-200) !important;
+  padding: 12px 16px !important;
+}
+tbody td {
+  padding: 12px 16px !important;
+  border-bottom: 1px solid var(--n-100) !important;
+  color: var(--n-700);
+  font-size: 13px;
+}
+tbody tr:hover {
+  background: var(--n-50);
+}
+tbody tr:last-child td {
+  border-bottom: none !important;
+}
+
+/* =========================================
+   INPUTS — moderni, focused
+   ========================================= */
+input:not([type="checkbox"]):not([type="radio"]),
+select,
+textarea {
+  transition: all .15s;
+  border-radius: 10px !important;
+  border: 1px solid var(--n-200) !important;
+  padding: 10px 14px !important;
+  font-size: 13px;
+  background: white;
+}
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none !important;
+  border-color: var(--brand-primary) !important;
+  box-shadow: var(--sh-glow) !important;
+}
+
+/* =========================================
+   BADGE / STATUS PILLS
+   ========================================= */
+.badge, .pill,
+[class*="bg-emerald-1"],
+[class*="bg-red-1"],
+[class*="bg-amber-1"] {
+  border-radius: 999px !important;
+  padding: 3px 10px !important;
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* =========================================
+   MODAL — modernije
+   ========================================= */
+.modal-content,
+[id*="modal-content"] {
+  border-radius: 18px !important;
+  box-shadow: var(--sh-4) !important;
+  border: 1px solid var(--n-200) !important;
+}
+
+/* =========================================
+   TOAST — moderniji
+   ========================================= */
+.toast-container > div,
+.toast {
+  border-radius: 12px !important;
+  box-shadow: var(--sh-3) !important;
+  border: 1px solid rgba(255,255,255,.1);
+  padding: 14px 18px !important;
+  font-weight: 500;
+}
+
+/* =========================================
+   SCROLLBAR — glađi
+   ========================================= */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--n-300);
+  border-radius: 3px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: var(--n-400);
+}
+
+/* =========================================
+   TOP BAR — modernije
+   ========================================= */
+header, .topbar {
+  backdrop-filter: blur(12px);
+  background: rgba(255,255,255,.85) !important;
+  border-bottom: 1px solid var(--n-200);
+}
+
+/* =========================================
+   BREADCRUMB / VIEW HEADER
+   ========================================= */
+.view-header {
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--n-100);
+}
+.view-header h1 {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--n-900);
+  letter-spacing: -0.02em;
+}
+.view-header .subtitle {
+  color: var(--n-500);
+  font-size: 13px;
+  margin-top: 4px;
+}
+
+/* =========================================
+   KPI CARDS — moderniji dashboard style
+   ========================================= */
+.kpi-card {
+  background: white;
+  border-radius: 14px;
+  border: 1px solid var(--n-200);
+  padding: 18px 20px;
+  transition: all .2s;
+  position: relative;
+  overflow: hidden;
+}
+.kpi-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: var(--brand-gradient);
+  opacity: 0;
+  transition: opacity .2s;
+}
+.kpi-card:hover {
+  box-shadow: var(--sh-2);
+  transform: translateY(-2px);
+}
+.kpi-card:hover::before {
+  opacity: 1;
+}
+.kpi-card .kpi-label {
+  color: var(--n-500);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.kpi-card .kpi-value {
+  color: var(--n-900);
+  font-size: 26px;
+  font-weight: 700;
+  margin-top: 6px;
+  letter-spacing: -0.02em;
+}
+.kpi-card .kpi-delta {
+  font-size: 12px;
+  margin-top: 8px;
+  font-weight: 500;
+}
+.kpi-card .kpi-delta.up { color: #059669; }
+.kpi-card .kpi-delta.down { color: #dc2626; }
+
+/* =========================================
+   ANIMACIJE (subtle)
+   ========================================= */
+@keyframes shimmer {
+  0% { background-position: -1000px 0; }
+  100% { background-position: 1000px 0; }
+}
+.skeleton {
+  background: linear-gradient(90deg, #f0f0f0 0%, #f8f8f8 50%, #f0f0f0 100%);
+  background-size: 1000px 100%;
+  animation: shimmer 1.5s infinite linear;
+  border-radius: 8px;
+}
+
+/* =========================================
+   DARK MODE — usklađena moderna paleta
+   ========================================= */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --n-50:  #0f172a;
+    --n-100: #1e293b;
+    --n-200: #334155;
+    --n-300: #475569;
+    --n-400: #64748b;
+    --n-500: #94a3b8;
+    --n-600: #cbd5e1;
+    --n-700: #e2e8f0;
+    --n-800: #f1f5f9;
+    --n-900: #f8fafc;
+  }
+}
+
+/* =========================================
+   MOBILE FIXES — bolja responsivnost
+   ========================================= */
+@media (max-width: 640px) {
+  .card { border-radius: 12px !important; }
+  aside nav button:hover, aside nav a:hover { transform: none; }
+}
+
+/* =========================================
+   SIDEBAR REDESIGN (v22.1)
+   Utility grid + quick actions + badges
+   ========================================= */
+
+/* Kompaktna utility traka (Refresh, Notif, Profile, Settings) */
+.sb-util-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  border-radius: 8px;
+  color: var(--muted, #94a3b8);
+  background: transparent;
+  border: 1px solid transparent;
+  transition: color 0.15s, background 0.15s, border-color 0.15s, transform 0.1s;
+  cursor: pointer;
+}
+.sb-util-btn:hover {
+  color: var(--accent, #4f46e5);
+  background: var(--hover-bg, #f1f5f9);
+  border-color: rgba(79, 70, 229, 0.15);
+}
+.sb-util-btn:active { transform: scale(0.94); }
+
+/* Kad je sidebar collapsed, utility grid postaje 1-column */
+body.sidebar-collapsed .sidebar-utility-grid {
+  grid-template-columns: 1fr;
+  gap: 0.4rem;
+}
+
+/* Quick action tastere (New Deal, Partner, Search) */
+.nav-quick-btn {
+  cursor: pointer;
+  min-height: 56px;
+}
+.nav-quick-btn svg {
+  width: 18px;
+  height: 18px;
+}
+body.sidebar-collapsed .nav-quick {
+  display: none;   /* stedi vertikalu kad je usko */
+}
+
+/* Nav badge — subtil sjaj kad je vrednost > 0 */
+.nav-badge {
+  box-shadow: 0 0 0 2px var(--panel, #fff);
+  animation: navBadgePulse 3s ease-in-out infinite;
+}
+@keyframes navBadgePulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.85; transform: scale(0.95); }
+}
+body.sidebar-collapsed .nav-badge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  min-width: 16px !important;
+  height: 16px !important;
+  font-size: 9px !important;
+}
+
+/* User avatar/status dot */
+#user-status-dot { animation: statusPulse 2s ease-in-out infinite; }
+@keyframes statusPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.6); }
+  50% { box-shadow: 0 0 0 4px rgba(16, 185, 129, 0); }
+}
+
+/* Sidebar group title — malo tanje sa razdvojnom linijom */
+.nav-group-title {
+  position: relative;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border, #e5e7eb);
+}
+.nav-group-title:first-of-type {
+  border-top: none;
+  padding-top: 0;
+}
+body.sidebar-collapsed .nav-group-title {
+  border: none !important;
+  padding: 0.5rem 0 0 !important;
+}
+
+/* =========================================
+   USER DISPLAY CUSTOMIZATION (v22.2)
+   Consumes CSS vars set by preferences.js
+   ========================================= */
+
+:root {
+  --user-font-size: 14px;
+  --user-line-height: 1.55;
+  --user-font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --user-modal-max: 800px;
+  --user-zoom: 1;
+}
+
+/* Global body typography — svi tekstovi bez posebnog inline font-size prate ovo */
+body {
+  font-family: var(--user-font-family);
+  font-size: var(--user-font-size);
+  line-height: var(--user-line-height);
+}
+
+/* Inputs / dugmadi / select nasledjuju font-family i base size */
+input, select, textarea, button {
+  font-family: inherit;
+}
+
+/* Existing app modal — postuj korisnicki modal-max width umesto tvrdog 4xl */
+#modal-content {
+  max-width: min(var(--user-modal-max), 96vw) !important;
+  width: 100% !important;
+}
+[data-modal-size="full"] #modal-content {
+  max-width: 96vw !important;
+  height: 92vh;
+  max-height: 92vh;
+}
+[data-modal-size="compact"] #modal-content {
+  max-width: min(520px, 96vw) !important;
+}
+
+/* Preferences modal takodje — i on mora da postuje user-modal-max */
+.pref-modal {
+  max-width: min(720px, var(--user-modal-max), 96vw) !important;
+}
+
+/* Density (compact) — smanji padding-e globalno */
+[data-density="compact"] .card,
+[data-density="compact"] table td,
+[data-density="compact"] table th {
+  padding-top: 0.375rem !important;
+  padding-bottom: 0.375rem !important;
+}
+[data-density="compact"] .btn { padding: 6px 12px; font-size: 12px; }
+
+/* High contrast toggle */
+[data-high-contrast="on"] {
+  --border: #0f172a;
+  --muted: #0f172a;
+  --hover-bg: #fef3c7;
+}
+[data-high-contrast="on"] body { color: #000; }
+[data-high-contrast="on"] .card { border-width: 2px !important; border-color: #0f172a !important; }
+[data-high-contrast="on"] .btn { border: 2px solid currentColor !important; }
+[data-high-contrast="on"] a { text-decoration: underline; }
+
+/* Reduce motion — ubij sve animacije i tranzicije */
+[data-reduce-motion="on"] *,
+[data-reduce-motion="on"] *::before,
+[data-reduce-motion="on"] *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+  scroll-behavior: auto !important;
+}
+
+/* =========================================
+   LAYOUT CUSTOMIZATION (v22.3)
+   Sidebar width, content max, accent color, radius
+   ========================================= */
+
+:root {
+  --user-sidebar-w: 18rem;
+  --user-content-max: 1400px;
+  --user-accent: #4f46e5;
+  --user-accent-rgb: 79, 70, 229;
+  --user-accent-soft: rgba(79, 70, 229, 0.12);
+  --user-radius: 10px;
+}
+
+/* Sidebar postuje user-sidebar-w umesto tvrdog w-72 */
+#app-sidebar {
+  width: var(--user-sidebar-w) !important;
+}
+@media (min-width: 1024px) {
+  #main-content {
+    margin-left: var(--user-sidebar-w) !important;
+    max-width: min(var(--user-content-max, 1400px), calc(100vw - var(--user-sidebar-w)));
+  }
+}
+
+/* V23.1 — MOBILE-RESPONSIVE SIDEBAR
+ * Ispod 1024px sidebar postaje off-canvas (kliza s leve strane sa overlay-om).
+ * Toggle: body class "sidebar-mobile-open" (postavlja topbar.js hamburger).
+ */
+@media (max-width: 1023.98px) {
+  #app-sidebar {
+    position: fixed !important;
+    top: 0; left: 0; bottom: 0;
+    z-index: 55;
+    transform: translateX(-100%);
+    transition: transform .25s ease;
+    box-shadow: 4px 0 20px rgba(0,0,0,.15);
+  }
+  body.sidebar-mobile-open #app-sidebar { transform: translateX(0); }
+  body.sidebar-mobile-open::after {
+    content:''; position:fixed; inset:0; z-index:54;
+    background: rgba(15,23,42,0.45);
+  }
+  #main-content { margin-left: 0 !important; max-width: 100vw !important; padding: 12px; }
+  /* Tabele na mobile-u dobijaju horizontal-scroll wrapper */
+  #main-content table { min-width: 640px; }
+  #main-content .overflow-x-auto { -webkit-overflow-scrolling: touch; }
+}
+
+/* Narrow sidebar → sakri nav-text (kao collapsed) */
+[data-sidebar-w="narrow"] .nav-text,
+[data-sidebar-w="narrow"] .sidebar-header-text,
+[data-sidebar-w="narrow"] .nav-group-title,
+[data-sidebar-w="narrow"] .nav-quick { display: none !important; }
+[data-sidebar-w="narrow"] .nav-item { justify-content: center; }
+
+/* Accent color — override --accent i --accent-soft koje app već koristi */
+:root {
+  --accent: var(--user-accent) !important;
+  --accent-soft: var(--user-accent-soft) !important;
+}
+.text-\[var\(--accent\)\], .text-blue-600, .text-indigo-500, .text-indigo-600, .text-indigo-700 { color: var(--user-accent) !important; }
+.bg-\[var\(--accent-soft\)\] { background: var(--user-accent-soft) !important; }
+.bg-gradient-to-br.from-indigo-500.to-purple-600,
+.bg-gradient-to-br.from-blue-600.to-indigo-700 {
+  background: linear-gradient(135deg, var(--user-accent), color-mix(in srgb, var(--user-accent) 60%, black)) !important;
+}
+.btn-primary, button.btn-primary {
+  background: linear-gradient(135deg, var(--user-accent), color-mix(in srgb, var(--user-accent) 70%, black)) !important;
+}
+.pref-btn-primary {
+  background: linear-gradient(135deg, var(--user-accent), color-mix(in srgb, var(--user-accent) 70%, black)) !important;
+}
+.pref-tab.active {
+  color: var(--user-accent) !important;
+  border-bottom-color: var(--user-accent) !important;
+}
+.pref-radio:has(input:checked) {
+  border-color: var(--user-accent) !important;
+  background: var(--user-accent-soft) !important;
+  color: color-mix(in srgb, var(--user-accent) 80%, black) !important;
+}
+
+/* Border radius customization */
+.card, .rounded-xl, .btn, .form-input, input, select, textarea,
+#modal-content, .pref-modal, .pref-btn {
+  border-radius: var(--user-radius) !important;
+}
+.rounded-full { border-radius: 9999px !important; }  /* zadrzi za avatar */
+.rounded { border-radius: calc(var(--user-radius) * 0.4) !important; }
+
+/* Focus ring boja iz accenta */
+input:focus, select:focus, textarea:focus, .form-input:focus {
+  box-shadow: 0 0 0 3px var(--user-accent-soft) !important;
+  border-color: var(--user-accent) !important;
+  outline: none;
+}

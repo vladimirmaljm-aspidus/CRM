@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Custom Reports — Aspidus CRM</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <style>
+    body { font-family: Inter, ui-sans-serif, system-ui, sans-serif; background: linear-gradient(180deg,#f8fafc,#eef2f7); min-height:100vh; }
+    .card { background:white; border-radius:14px; border:1px solid #e5e7eb; padding:18px 20px; }
+    .btn { padding:8px 14px; border-radius:10px; font-weight:600; font-size:13px; transition:.15s; display:inline-flex; align-items:center; gap:6px; cursor:pointer; }
+    .btn-ghost { background:white; color:#334155; border:1px solid #e5e7eb; }
+    .btn-primary { background:linear-gradient(135deg,#4f46e5,#7c3aed); color:white; }
+    .btn-danger { background:#ef4444; color:white; }
+    textarea.sql { font-family:ui-monospace,monospace; font-size:12px; }
+    input, select, textarea { padding:8px 12px; border:1px solid #e2e8f0; border-radius:8px; width:100%; }
+    input:focus, select:focus, textarea:focus { outline:none; border-color:#4f46e5; box-shadow:0 0 0 3px rgba(79,70,229,.15); }
+  </style>
+</head>
+<body class="p-6 md:p-8">
+<div class="max-w-6xl mx-auto">
+  <div class="flex items-center justify-between mb-6">
+    <div class="flex items-center gap-3">
+      <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white flex items-center justify-center text-xl shadow">📊</div>
+      <div>
+        <h1 class="text-2xl font-bold text-slate-900">Custom Reports</h1>
+        <p class="text-xs text-slate-500 mt-0.5">Admin definise safe SQL SELECT + chart type. Rezultat se renderuje Chart.js-om.</p>
+      </div>
+    </div>
+    <div class="flex gap-2">
+      <button class="btn btn-primary" onclick="newReport()">+ New Report</button>
+      <a href="/" class="btn btn-ghost">← CRM</a>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+    <div class="card lg:col-span-1">
+      <b class="text-slate-900 text-sm uppercase tracking-widest">Reports</b>
+      <div id="report-list" class="mt-3 space-y-2 text-sm text-slate-500">⏳ Loading…</div>
+    </div>
+    <div class="card lg:col-span-2" id="report-editor">
+      <div class="text-slate-400 text-sm text-center py-16">
+        Select a report to view, or click <b>+ New Report</b> to create one.
+      </div>
+    </div>
+  </div>
+</div>
+
+<script nonce="{{ g.csp_nonce }}">
+let csrf = '';
+let editing = null;
+let chartInstance = null;
+
+async function _csrf() {
+    if (csrf) return csrf;
+    try { const r = await fetch('/api/csrf/token'); csrf = (await r.json()).csrf_token || ''; } catch(_) {}
+    return csrf;
+}
+
+function esc(s) { return String(s || '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+
+async function loadList() {
+    const div = document.getElementById('report-list');
+    try {
+        const r = await fetch('/api/reports');
+        const j = await r.json();
+        if (!j.reports || !j.reports.length) {
+            div.innerHTML = '<div class="text-center py-4 text-slate-400 italic">No reports yet.</div>';
+            return;
+        }
+        div.innerHTML = j.reports.map(r => `
+            <button onclick="openReport('${r.id}')" class="w-full text-left px-3 py-2 rounded-lg hover:bg-indigo-50 border border-slate-200 hover:border-indigo-300 transition">
+                <div class="flex items-center justify-between gap-2">
+                    <b class="text-slate-900 text-sm truncate">${esc(r.title)}</b>
+                    <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 uppercase">${esc(r.chart_type)}</span>
+                </div>
+                <div class="text-[10px] text-slate-400 mt-0.5">${r.is_shared ? '🔗 shared' : '🔒 private'} · ${esc(r.updated_at?.substring(0,10) || '')}</div>
+            </button>
+        `).join('');
+    } catch(e) { div.innerHTML = '<div class="text-red-600">' + esc(e.message) + '</div>'; }
+}
+
+function newReport() {
+    editing = { id: null, title: '', description: '', sql_query: '-- Example:\nSELECT status, COUNT(*) AS cnt FROM deals GROUP BY status', chart_type: 'bar', is_shared: false };
+    renderEditor();
+}
+
+async function openReport(rid) {
+    try {
+        const r = await fetch('/api/reports/' + encodeURIComponent(rid));
+        editing = await r.json();
+        renderEditor();
+        runReport();
+    } catch(e) { alert('Load failed: ' + e.message); }
+}
+
+function renderEditor() {
+    const div = document.getElementById('report-editor');
+    div.innerHTML = `
+        <div class="space-y-3">
+            <div class="flex items-center gap-2">
+                <input id="rp-title" value="${esc(editing.title)}" placeholder="Report title" class="flex-1">
+                <select id="rp-chart">
+                    <option value="table" ${editing.chart_type==='table'?'selected':''}>Table</option>
+                    <option value="kpi" ${editing.chart_type==='kpi'?'selected':''}>KPI</option>
+                    <option value="bar" ${editing.chart_type==='bar'?'selected':''}>Bar</option>
+                    <option value="line" ${editing.chart_type==='line'?'selected':''}>Line</option>
+                    <option value="pie" ${editing.chart_type==='pie'?'selected':''}>Pie</option>
+                </select>
+            </div>
+            <input id="rp-desc" value="${esc(editing.description || '')}" placeholder="Description (optional)">
+            <textarea id="rp-sql" class="sql" rows="6">${esc(editing.sql_query)}</textarea>
+            <label class="flex items-center gap-2 text-xs text-slate-600">
+                <input type="checkbox" id="rp-shared" ${editing.is_shared?'checked':''}>
+                Share with all users
+            </label>
+            <div class="flex gap-2">
+                <button class="btn btn-primary" onclick="saveReport()">💾 Save</button>
+                <button class="btn btn-ghost" onclick="runReport()">▶ Run</button>
+                ${editing.id ? `<button class="btn btn-danger" onclick="deleteReport()">🗑 Delete</button>` : ''}
+                <div class="flex-1"></div>
+                <div class="text-xs text-slate-400 flex items-center">SELECT/WITH only · no ; no writes</div>
+            </div>
+            <div id="rp-result" class="mt-4 border border-slate-200 rounded-lg p-3 min-h-[240px]">
+                <div class="text-slate-400 text-sm text-center py-16">Click Run to preview.</div>
+            </div>
+        </div>
+    `;
+}
+
+async function saveReport() {
+    const body = {
+        title: document.getElementById('rp-title').value.trim(),
+        description: document.getElementById('rp-desc').value.trim(),
+        sql_query: document.getElementById('rp-sql').value.trim(),
+        chart_type: document.getElementById('rp-chart').value,
+        is_shared: document.getElementById('rp-shared').checked,
+    };
+    if (!body.title || !body.sql_query) { alert('Title + SQL required.'); return; }
+    const csrfTok = await _csrf();
+    const url = editing.id ? `/api/reports/${editing.id}` : '/api/reports';
+    // NOTE: PUT nije implementiran — za jednostavnost sa novim uvek POST
+    // (za edit obrisi + kreiraj)
+    if (editing.id) {
+        if (!confirm('Delete old version and save as new?')) return;
+        await fetch(`/api/reports/${editing.id}`, {method:'DELETE', headers:{'X-CSRF-Token':csrfTok}});
+    }
+    const r = await fetch('/api/reports', {
+        method: 'POST', headers: {'Content-Type':'application/json', 'X-CSRF-Token':csrfTok},
+        body: JSON.stringify(body)
+    });
+    const j = await r.json();
+    if (r.ok) {
+        alert('✓ Saved.');
+        editing.id = j.id;
+        loadList();
+        openReport(j.id);
+    } else alert('✗ ' + (j.detail || j.error || r.status));
+}
+
+async function deleteReport() {
+    if (!editing.id) return;
+    if (!confirm('Delete this report?')) return;
+    const r = await fetch(`/api/reports/${editing.id}`, {method:'DELETE', headers:{'X-CSRF-Token': await _csrf()}});
+    if (r.ok) { alert('Deleted.'); editing = null; document.getElementById('report-editor').innerHTML = ''; loadList(); }
+    else alert('Delete failed.');
+}
+
+async function runReport() {
+    const result = document.getElementById('rp-result');
+    result.innerHTML = '<div class="text-slate-400 text-sm text-center py-8">⏳ Running query…</div>';
+    // Ako je unsaved, moramo save prvo (SQL validaciju i storage)
+    if (!editing.id) { alert('Save first before running.'); return; }
+    try {
+        const r = await fetch(`/api/reports/${editing.id}/run`);
+        const j = await r.json();
+        if (!r.ok) { result.innerHTML = `<div class="text-red-600 p-3">✗ ${esc(j.detail || j.error)}</div>`; return; }
+        renderResult(j);
+    } catch (e) { result.innerHTML = '<div class="text-red-600">' + esc(e.message) + '</div>'; }
+}
+
+function renderResult(j) {
+    const div = document.getElementById('rp-result');
+    if (!j.rows || !j.rows.length) {
+        div.innerHTML = '<div class="text-slate-400 text-sm text-center py-8">No rows returned.</div>';
+        return;
+    }
+    if (chartInstance) { try { chartInstance.destroy(); } catch(_) {} chartInstance = null; }
+    if (j.chart_type === 'table') {
+        const rows = j.rows.map(r => `<tr>${j.columns.map(c => `<td class="px-2 py-1 text-xs border-b border-slate-100">${esc(r[c])}</td>`).join('')}</tr>`).join('');
+        div.innerHTML = `<table class="w-full text-sm"><thead class="bg-slate-50 text-[10px] uppercase tracking-wider text-slate-500"><tr>${j.columns.map(c => `<th class="px-2 py-1 text-left">${esc(c)}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table>
+        <div class="text-xs text-slate-400 mt-2">${j.row_count} rows · ${j.elapsed_ms}ms</div>`;
+        return;
+    }
+    if (j.chart_type === 'kpi') {
+        const first = j.rows[0];
+        const cols = j.columns;
+        div.innerHTML = `<div class="text-center py-6">
+            <div class="text-4xl font-bold text-indigo-700">${esc(first[cols[cols.length-1]])}</div>
+            <div class="text-sm text-slate-500 mt-2">${esc(cols[cols.length-1])}</div>
+        </div>`;
+        return;
+    }
+    // bar / line / pie
+    div.innerHTML = '<canvas id="rp-chart" height="160"></canvas><div id="rp-meta" class="text-xs text-slate-400 mt-2"></div>';
+    const ctx = document.getElementById('rp-chart').getContext('2d');
+    const labels = j.rows.map(r => r[j.columns[0]]);
+    const values = j.rows.map(r => Number(r[j.columns[1]] || 0));
+    chartInstance = new Chart(ctx, {
+        type: j.chart_type,
+        data: {
+            labels,
+            datasets: [{
+                label: j.columns[1],
+                data: values,
+                backgroundColor: ['#4f46e5','#7c3aed','#0ea5e9','#10b981','#f59e0b','#ef4444','#64748b','#a855f7'],
+                borderColor: '#4f46e5',
+                fill: j.chart_type === 'line' ? false : true,
+            }]
+        },
+        options: { responsive: true, maintainAspectRatio: false }
+    });
+    document.getElementById('rp-meta').textContent = `${j.row_count} rows · ${j.elapsed_ms}ms`;
+}
+
+(async () => { await _csrf(); loadList(); })();
+</script>
+</body>
+</html>

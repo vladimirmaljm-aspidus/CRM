@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ title }} — Aspidus Portal</title>
+  <meta name="robots" content="noindex, nofollow">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, sans-serif;
+      min-height: 100vh;
+      background: radial-gradient(1200px 600px at 20% -10%, rgba(99, 102, 241, .18), transparent 60%),
+                  radial-gradient(1000px 500px at 100% 110%, rgba(168, 85, 247, .15), transparent 60%),
+                  linear-gradient(180deg, #f1f5f9, #e2e8f0);
+    }
+    .card {
+      background: rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(24px);
+      border-radius: 22px;
+      box-shadow: 0 30px 80px rgba(15, 23, 42, .18);
+      border: 1px solid rgba(255, 255, 255, .8);
+    }
+    .icon {
+      width: 84px;
+      height: 84px;
+      border-radius: 22px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 40px;
+      color: white;
+      box-shadow: 0 12px 28px rgba(0, 0, 0, .2);
+    }
+    .icon.invalid_token { background: linear-gradient(135deg, #f59e0b, #dc2626); }
+    .icon.revoked       { background: linear-gradient(135deg, #ef4444, #7f1d1d); }
+    .icon.expired       { background: linear-gradient(135deg, #6366f1, #4f46e5); }
+    .icon.default       { background: linear-gradient(135deg, #64748b, #334155); }
+  </style>
+</head>
+<body class="flex items-center justify-center px-4 py-10">
+  <div class="card max-w-lg w-full p-8 md:p-10 text-center">
+    <div class="icon {{ reason if reason in ('invalid_token', 'revoked', 'expired') else 'default' }} mx-auto mb-6">
+      {% if reason == 'invalid_token' %}⚠{% elif reason == 'revoked' %}🔒{% elif reason == 'expired' %}⏱{% else %}ℹ{% endif %}
+    </div>
+    <h1 class="text-2xl font-bold text-slate-900 mb-2 tracking-tight">{{ title }}</h1>
+    <p class="text-slate-600 leading-relaxed mb-6">{{ message }}</p>
+
+    {% if contact %}
+    <div class="rounded-xl bg-slate-50 border border-slate-200 p-4 text-sm text-slate-700 mb-6 text-left">
+      <div class="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1">Need help?</div>
+      {{ contact }}
+    </div>
+    {% endif %}
+
+    <div class="flex flex-wrap justify-center gap-2">
+      <a href="/portal/login" class="inline-block px-6 py-2.5 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white font-semibold text-sm shadow-md hover:shadow-lg transition">
+        Go to Portal Sign in
+      </a>
+      <a href="https://aspidus.co" class="inline-block px-6 py-2.5 rounded-xl bg-white text-slate-700 border border-slate-200 font-semibold text-sm hover:bg-slate-50 transition">
+        Aspidus.co
+      </a>
+    </div>
+
+    <p class="text-xs text-slate-400 mt-6">© Aspidus — Secure Client Portal</p>
+  </div>
+</body>
+</html>
