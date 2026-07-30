@@ -447,11 +447,9 @@ def _claim_next(conn, worker_id, now_iso):
 
     Vraća db._PgRow ili None.
     """
-    # SQLite < 3.35 nema RETURNING; pouzdano radimo dvokorak pod istom transakcijom.
-    # Isolation level je 'DEFERRED' default što znači BEGIN se otvara pri prvom
-    # write-u; forsiramo IMMEDIATE da bi lock-ovali write pre selecta.
     # PostgreSQL: SELECT ... FOR UPDATE radi isti posao kao BEGIN IMMEDIATE u SQLite
     # (zaključa red pre nego što ga read-ujemo, sprečavajući double-pickup).
+    # Ne koristimo BEGIN IMMEDIATE jer to ne postoji u PostgreSQL sintaksi.
     row = conn.execute(
         "SELECT id, recipient, subject, plain_body, html_body, attempts "
         "FROM email_queue "
