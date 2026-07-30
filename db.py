@@ -35,6 +35,7 @@ logger = logging.getLogger(__name__)
 # ne može da radi — jasan ImportError sa porukom za instalaciju.
 import psycopg
 import psycopg_pool as _pgpool
+from psycopg.rows import dict_row
 
 
 # ==========================================================
@@ -135,8 +136,16 @@ class _PgCursor:
     da sav postojeći kod (c.execute(...), c.fetchone(), c.fetchall(), c.rowcount)
     nastavi da radi bez izmena.
     """
-    def __init__(self, real_cursor):
+        def __init__(self, real_cursor):
         self._c = real_cursor
+        # KLJUČNO: psycopg po defaultu vraća tuple redove, ali _PgRow nasleđuje dict
+        # i očekuje dict. Bez ove linije fetchone() pada sa:
+        #   "ValueError: dictionary update sequence element #0 has length N; 2 is required"
+        # dict_row čini da fetchone()/fetchall() vraćaju dict, što _PgRow prihvata.
+        try:
+            self._c.row_factory = dict_row
+        except Exception:
+            pass
 
     def execute(self, sql, params=()):
         return self._c.execute(_convert_placeholders(sql), params)
