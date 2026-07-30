@@ -287,7 +287,12 @@ class PooledConnection:
 
 
 def _get_dsn():
-    """Vraća DSN za psycopg. Ako env DATABASE_URL nije postavljen, baci grešku."""
+    """Vraća DSN za psycopg. Ako env DATABASE_URL nije postavljen, baci grešku.
+
+    Dodaje sslmode=require ako već nije u DSN-u — Supabase transaction pooler
+    (port 6543) zahteva SSL i bez njega konekcije padaju sa
+    'SSL error: unexpected eof while reading'.
+    """
     global _DSN
     dsn = (_DSN or os.getenv("DATABASE_URL") or "").strip()
     if not dsn:
@@ -297,11 +302,39 @@ def _get_dsn():
             "aplikacija ne može da se poveže na bazu. Postavite DATABASE_URL env var "
             "(Supabase Dashboard → Settings → Database → Connection string, URI mode)."
         )
+    # Dodaj sslmode=require ako već nije prisutan (Supabase zahteva SSL).
+    if "sslmode" not in dsn:
+        sep = "&" if "?" in dsn else "?"
+        dsn = dsn + sep + "sslmode=require"
     return dsn
 
 
+def _configure_conn(conn):
+    """Poziva se pri svakoj novoj konekciji iz pool-a.
+
+    Postavlja statement_timeout da spreči da jedan zaglavljen upit drži konekciju
+    zauvek, i autocommit=False (transakcije) što odgovara starom SQLite ponašanju.
+    """
+    try:
+        conn.autocommit = False
+    except Exception:
+        pass
+    try:
+        # 60s timeout po statementu — sprečava da zaglavljen upit drži konekciju.
+        with conn.cursor() as cur:
+            cur.execute("SET statement_timeout = 60000")
+    except Exception:
+        pass
+
+
 def _ensure_pool():
-    """Lazy-kreira connection pool (thread-safe)."""
+    """Lazy-kreira connection pool (thread-safe).
+
+    Koristi configure callback koji postavlja statement_timeout i autocommit.
+    max_idle=120 i max_lifetime=300 osiguravaju da se "stare" konekcije recikliraju
+    pre nego što ih Supabase pooler (PgBouncer) ugasi — to rešava
+    'SSL error: unexpected eof' i 'discarding closed connection [BAD]' greške.
+    """
     global _pool
     if _pool is not None:
         return _pool
@@ -309,11 +342,17 @@ def _ensure_pool():
         if _pool is not None:
             return _pool
         dsn = _get_dsn()
-        # minconn=1, maxconn=8 — dovoljno za Render free (2 gunicorn workera).
-        # Supabase Transaction pooler (port 6543) i sam kešira konekcije.
         try:
-            _pool = _pgpool.ConnectionPool(dsn, min_size=1, max_size=8)
-            logger.info("DB POOL: uspešno konektovan na Supabase PostgreSQL.")
+            _pool = _pgpool.ConnectionPool(
+                dsn,
+                min_size=1,
+                max_size=8,
+                max_idle=120,       # recikliraj idle konekcije posle 2 min
+                max_lifetime=300,   # recikliraj sve konekcije posle 5 min
+                timeout=30,         # čekaj max 30s na getconn
+                configure=_configure_conn,
+            )
+            logger.info("DB POOL: uspešno konektovan na Supabase PostgreSQL (SSL=require).")
         except Exception as e:
             logger.error(f"DB POOL: ne mogu da se konektujem na bazu: {e}")
             raise
@@ -397,7 +436,8 @@ def retry_on_lock(max_attempts=6, base_delay=0.1):
                     transient = ('server closed the connection' in msg
                                  or 'connection' in msg and 'reset' in msg
                                  or 'timeout expired' in msg
-                                 or 'too many clients' in msg)
+                                 or 'too many clients' in msg
+                                 or 'ssl' in msg)
                     if not transient or attempt == max_attempts - 1:
                         raise
                     wait = base_delay * (2 ** attempt)
