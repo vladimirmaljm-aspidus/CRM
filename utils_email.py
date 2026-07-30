@@ -376,13 +376,16 @@ def _ensure_queue_schema(conn):
         status TEXT DEFAULT 'pending'
     )''')
     # v22 migration — dodajemo lock kolone za row-level exclusion i idempotency
-    cols = {r[1] for r in conn.execute("PRAGMA table_info(email_queue)").fetchall()}
+    # PostgreSQL: koristimo information_schema umesto SQLite PRAGMA table_info.
+    cols = {r[0] for r in conn.execute(
+        "SELECT column_name FROM information_schema.columns WHERE table_name='email_queue'"
+    ).fetchall()}
     if 'sending_started_at' not in cols:
-        conn.execute("ALTER TABLE email_queue ADD COLUMN sending_started_at TEXT")
+        conn.execute("ALTER TABLE email_queue ADD COLUMN IF NOT EXISTS sending_started_at TEXT")
     if 'worker_id' not in cols:
-        conn.execute("ALTER TABLE email_queue ADD COLUMN worker_id TEXT")
+        conn.execute("ALTER TABLE email_queue ADD COLUMN IF NOT EXISTS worker_id TEXT")
     if 'sent_at' not in cols:
-        conn.execute("ALTER TABLE email_queue ADD COLUMN sent_at TEXT")
+        conn.execute("ALTER TABLE email_queue ADD COLUMN IF NOT EXISTS sent_at TEXT")
 
 
 def _park_in_queue(recipient, subject, plain_body, html_body, attachments, error):
@@ -442,7 +445,7 @@ def _claim_next(conn, worker_id, now_iso):
     (SQLite serialize-uje UPDATE-e). Bez ovog pattern-a select+update sekvenca
     imala je window za double-pickup pod concurrency-jem.
 
-    Vraća sqlite3.Row ili None.
+    Vraća db._PgRow ili None.
     """
     # SQLite < 3.35 nema RETURNING; pouzdano radimo dvokorak pod istom transakcijom.
     # Isolation level je 'DEFERRED' default što znači BEGIN se otvara pri prvom
@@ -498,12 +501,12 @@ def process_email_queue(max_batch=10):
         # 1) startup / crash recovery
         try:
             conn = db.connect_raw(DB_FILE)
-            conn.row_factory = sqlite3.Row
+            conn.row_factory = db._PgRow
             _ensure_queue_schema(conn)
             _recover_stuck_sending(conn, worker_id)
             conn.commit()
             conn.close()
-        except sqlite3.DatabaseError as db_err:
+        except db.DatabaseError as db_err:
             # "database disk image is malformed" — ne spamuj log svakih 30s.
             # Loguj JEDNOM po worker-ID-u pa ućuti; admin mora ručno pokrenuti
             # scripts/db_recover.py da vrati bazu.
@@ -527,7 +530,7 @@ def process_email_queue(max_batch=10):
         for _ in range(max_batch):
             try:
                 conn = db.connect_raw(DB_FILE)
-                conn.row_factory = sqlite3.Row
+                conn.row_factory = db._PgRow
                 now = datetime.now(timezone.utc)
                 now_iso = now.isoformat().replace('+00:00', 'Z')
                 row = _claim_next(conn, worker_id, now_iso)
@@ -599,7 +602,7 @@ def process_email_queue(max_batch=10):
                     conn.close()
                     terminal_ok = True
                     break
-                except sqlite3.OperationalError as db_e:
+                except db.OperationalError as db_e:
                     logger.warning(f'[{worker_id}] terminal commit attempt {attempt_no+1} '
                                    f'for {row["id"]} failed ({db_e}) — retrying in 0.5s')
                     import time as _t

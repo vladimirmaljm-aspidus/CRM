@@ -27,11 +27,13 @@ def login():
     device_info = data.get('device', 'UNKNOWN_DEVICE')
     totp_code = str(data.get('totp_code', '')).strip()
     recovery_code = str(data.get('recovery_code', '')).strip()
-    
-    # 1. STRIKTNA KONTROLA LOKACIJE
-    if not location or ',' not in location:
-        log_audit('SECURITY', 'system', f'Failed login, missing or empty GPS location. User: {username}', is_suspicious=True, location='DENIED')
-        return jsonify({"error": "LOCATION_REQUIRED"}), 403
+
+    # 1. LOKACIJA — OPCIONA. Ranije je login ZAHTEVAO GPS (navigator.geolocation),
+    # što je blokiralo prijavu na desktop računarima bez GPS-a i kad korisnik
+    # odbije deljenje lokacije. Sada se lokacija samo BELEŽI (radi audit traga),
+    # a login nastavlja i bez nje. location ostaje prazan string kao fallback.
+    if not location or ',' not in str(location):
+        location = ''
     
     # 2. Provera da li je IP blokiran
     client_ip = get_client_ip()

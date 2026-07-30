@@ -221,25 +221,16 @@ def health_smtp() -> dict:
 
 
 def health_sqlite() -> dict:
-    """Lokalne SQLite baze — može li da otvori, integrity_check."""
+    """PostgreSQL (Supabase) health check — zamenjuje stari SQLite integrity check.
+    Sve podatke čuvamo isključivo na Supabase, nema lokalnih .db fajlova."""
     try:
-        import os
-        import sqlite3
-        from config import DB_FILE, PORTAL_DB_FILE, AUDIT_DB_FILE
-        checks = {}
-        for label, path in (("crm", DB_FILE), ("portal", PORTAL_DB_FILE), ("audit", AUDIT_DB_FILE)):
-            if not os.path.exists(path):
-                checks[label] = {"exists": False}
-                continue
-            try:
-                conn = db.connect_raw(path, timeout=3.0)
-                integ = conn.execute("PRAGMA integrity_check").fetchone()
-                conn.close()
-                checks[label] = {"exists": True, "integrity": integ[0] if integ else "?"}
-            except Exception as e:
-                checks[label] = {"exists": True, "error": str(e)[:100]}
-        ok = all(v.get("integrity") == "ok" for v in checks.values() if v.get("exists"))
-        return {"ok": ok, "status": "checked", "detail": checks}
+        from config import DATABASE_URL
+        if not DATABASE_URL:
+            return {"ok": False, "status": "error", "detail": "DATABASE_URL nije postavljen"}
+        import db
+        result = db.health_check()
+        return {"ok": result.get("ok", False), "status": "checked",
+                "backend": "postgresql", "detail": result}
     except Exception as e:
         return {"ok": False, "status": "error", "detail": f"{type(e).__name__}: {str(e)[:200]}"}
 

@@ -9,11 +9,9 @@ services:
         value: "3.11.6"
       - key: SESSION_COOKIE_SECURE
         value: "true"
+      - key: SESSION_COOKIE_SAMESITE
+        value: "Lax"
       - key: DATA_DIR
         value: /opt/render/project/src/data
       - key: FLASK_ENV
         value: production
-    disk:
-      name: aspidus-data
-      mountPath: /opt/render/project/src/data
-      sizeGB: 1

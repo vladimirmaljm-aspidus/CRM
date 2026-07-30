@@ -396,7 +396,7 @@ def document_text_preview():
                 "FROM file_text WHERE file_url=?",
                 (file_url,)
             ).fetchone()
-    except sqlite3.OperationalError as e:
+    except db.OperationalError as e:
         return jsonify({'error': str(e)[:200]}), 500
     if not row:
         return jsonify({'preview': None, 'available': False,
@@ -427,7 +427,7 @@ def document_search():
                 "ORDER BY extracted_at DESC LIMIT 50",
                 (f'%{q}%',)
             ).fetchall()
-    except sqlite3.OperationalError as e:
+    except db.OperationalError as e:
         return jsonify({'error': str(e)[:200]}), 500
     return jsonify({
         'query': q, 'total': len(rows),

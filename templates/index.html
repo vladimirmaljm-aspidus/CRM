@@ -422,13 +422,13 @@
 
                     let devInfo = `OS: ${navigator.platform} | Engine: ${navigator.vendor || 'Nepoznato'} | Res: ${screen.width}x${screen.height} | Boje: ${screen.colorDepth}-bit | Cores: ${navigator.hardwareConcurrency || 'N/A'} | RAM: ${navigator.deviceMemory ? navigator.deviceMemory + 'GB' : 'N/A'} | TZ: ${Intl.DateTimeFormat().resolvedOptions().timeZone}`;
                     
-                    let locData;
+                    let locData = '';
 
                     const getGPS = () => new Promise((resolve, reject) => {
                         if (!navigator.geolocation) {
                             return reject(loginDict[currentLoginLang].err_gps_notsupp);
                         }
-                        
+
                         navigator.geolocation.getCurrentPosition(
                             (pos) => resolve(`${pos.coords.latitude},${pos.coords.longitude}`),
                             (error) => {
@@ -450,14 +450,12 @@
                         );
                     });
 
+                    // GPS je sada OPCIONA — ako ga nema ili korisnik odbije, login
+                    // nastavlja sa praznom lokacijom (samo radi audit traga na serveru).
                     try {
                         locData = await getGPS();
                     } catch (gpsError) {
-                        errText.innerText = gpsError;
-                        err.classList.remove('hidden');
-                        btn.innerHTML = originalText;
-                        btn.disabled = false;
-                        return; 
+                        locData = '';
                     }
 
                     // Prikaži profesionalan loader za vreme login provere sesije

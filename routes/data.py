@@ -1183,7 +1183,7 @@ def deal_timeline(deal_id):
                 _add(issued_at, 'document', title, sub,
                      meta={'docNumber': doc_num, 'docType': doc_type, 'revision': rev},
                      icon='📄')
-        except sqlite3.OperationalError:
+        except db.OperationalError:
             pass  # tabela nije još kreirana
 
         # 4) Document revisions with reason
@@ -1199,7 +1199,7 @@ def deal_timeline(deal_id):
                      f"Reason: {rev_row[2]}  ·  By: {rev_row[3]}",
                      meta={'docNumber': rev_row[0], 'revision': rev_row[1]},
                      icon='🔁')
-        except sqlite3.OperationalError:
+        except db.OperationalError:
             pass
     finally:
         if conn:
@@ -1223,7 +1223,7 @@ def deal_timeline(deal_id):
                          f"{a_module}: {(a_details or '')[:180]}  ·  By: {a_user or 'system'}",
                          meta={'action': a_action, 'module': a_module},
                          icon='🛡️')
-            except sqlite3.OperationalError:
+            except db.OperationalError:
                 pass
         aconn.close()
     except Exception:

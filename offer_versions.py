@@ -60,7 +60,7 @@ def _diff_fields(old: dict, new: dict) -> list[str]:
 
 
 def snapshot_if_changed(
-    conn: sqlite3.Connection,
+    conn: object,
     offer_id: str,
     old_offer: dict,
     new_offer: dict,
@@ -125,7 +125,7 @@ def snapshot_if_changed(
         return None
 
 
-def list_versions(conn: sqlite3.Connection, offer_id: str) -> list[dict]:
+def list_versions(conn: object, offer_id: str) -> list[dict]:
     """Vraća listu verzija (bez snapshot-a — samo metapodaci za listu)."""
     try:
         c = conn.cursor()
@@ -150,7 +150,7 @@ def list_versions(conn: sqlite3.Connection, offer_id: str) -> list[dict]:
         return []
 
 
-def get_snapshot(conn: sqlite3.Connection, version_id: str) -> dict | None:
+def get_snapshot(conn: object, version_id: str) -> dict | None:
     """Vraća pun JSON snapshot za jednu verziju."""
     try:
         c = conn.cursor()

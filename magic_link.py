@@ -142,7 +142,7 @@ def verify(ml_param, expected_portal_token, client_ip=None):
                      (client_ip or '')[:64])
                 )
                 conn.commit()
-            except sqlite3.IntegrityError:
+            except db.IntegrityError:
                 return (False, 'already_used')
     except Exception:
         return (False, 'invalid_format')

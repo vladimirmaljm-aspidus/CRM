@@ -190,7 +190,7 @@ def create_custom_field():
                  int(body.get('display_order') or 100),
                  _now())
             )
-    except sqlite3.IntegrityError:
+    except db.IntegrityError:
         return jsonify({'error': 'field_key_already_exists'}), 409
     return jsonify({'id': fid})
 

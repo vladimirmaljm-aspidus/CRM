@@ -48,7 +48,7 @@ def notes_list(entity_type, entity_id):
                 "ORDER BY pinned DESC, created_at DESC LIMIT 200",
                 (entity_type, entity_id)
             ).fetchall()
-    except sqlite3.OperationalError as e:
+    except db.OperationalError as e:
         return jsonify({'error': str(e)[:200]}), 500
     return jsonify({
         'entity_type': entity_type, 'entity_id': entity_id,
@@ -78,7 +78,7 @@ def notes_create(entity_type, entity_id):
                 (nid, entity_type, entity_id, body[:5000],
                  session.get('username') or 'system', _iso_now())
             )
-    except sqlite3.OperationalError as e:
+    except db.OperationalError as e:
         return jsonify({'error': str(e)[:200]}), 500
     log_audit('CREATE', entity_type, f'Note added to {entity_type}/{entity_id}')
     return jsonify({'id': nid, 'ok': True})
@@ -100,7 +100,7 @@ def notes_delete(note_id):
             if not (is_owner or is_admin):
                 return jsonify({'error': 'forbidden'}), 403
             conn.execute("DELETE FROM entity_notes WHERE id=?", (note_id,))
-    except sqlite3.OperationalError as e:
+    except db.OperationalError as e:
         return jsonify({'error': str(e)[:200]}), 500
     return jsonify({'deleted': 1})
 
@@ -115,7 +115,7 @@ def notes_pin(note_id):
                 "UPDATE entity_notes SET pinned=? WHERE id=?",
                 (1 if pinned else 0, note_id)
             ).rowcount
-    except sqlite3.OperationalError as e:
+    except db.OperationalError as e:
         return jsonify({'error': str(e)[:200]}), 500
     return jsonify({'updated': n, 'pinned': pinned})
 
@@ -135,7 +135,7 @@ def deal_docs_list(deal_id):
                 "FROM deal_documents WHERE deal_id=? ORDER BY uploaded_at DESC",
                 (deal_id,)
             ).fetchall()
-    except sqlite3.OperationalError as e:
+    except db.OperationalError as e:
         return jsonify({'error': str(e)[:200]}), 500
     return jsonify({
         'deal_id': deal_id,
@@ -173,7 +173,7 @@ def deal_docs_attach(deal_id):
                 (did, deal_id, file_url, filename[:200], doc_kind, size_bytes,
                  session.get('username') or 'system', _iso_now(), note)
             )
-    except sqlite3.OperationalError as e:
+    except db.OperationalError as e:
         return jsonify({'error': str(e)[:200]}), 500
     log_audit('CREATE', 'deal_documents',
               f'Attached "{filename}" ({doc_kind}) to deal {deal_id}')
@@ -186,7 +186,7 @@ def deal_docs_detach(doc_id):
     try:
         with db.connect_raw(DB_FILE) as conn:
             n = conn.execute("DELETE FROM deal_documents WHERE id=?", (doc_id,)).rowcount
-    except sqlite3.OperationalError as e:
+    except db.OperationalError as e:
         return jsonify({'error': str(e)[:200]}), 500
     return jsonify({'deleted': n})
 
@@ -213,7 +213,7 @@ def inventory_low_stock():
                 "ORDER BY (qty_on_hand - qty_reserved) ASC, last_movement_at DESC LIMIT 500",
                 (threshold,)
             ).fetchall()
-    except sqlite3.OperationalError as e:
+    except db.OperationalError as e:
         return jsonify({'error': str(e)[:200]}), 500
 
     # Enrich sa partner + product names
@@ -272,7 +272,7 @@ def audit_export_csv():
         conn = db.connect_raw(AUDIT_DB_FILE)
         rows = conn.execute(q, tuple(params)).fetchall()
         conn.close()
-    except sqlite3.OperationalError as e:
+    except db.OperationalError as e:
         return jsonify({'error': str(e)[:200]}), 500
 
     buf = io.StringIO()

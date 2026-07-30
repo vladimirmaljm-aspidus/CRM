@@ -2080,7 +2080,7 @@ def admin_portal_pending_counts():
         try:
             cp.execute("SELECT COUNT(*) FROM profile_change_requests WHERE status='pending'")
             counts["profile_requests"] = cp.fetchone()[0] or 0
-        except sqlite3.OperationalError:
+        except db.OperationalError:
             counts["profile_requests"] = 0
         conn_p.close()
     except Exception:

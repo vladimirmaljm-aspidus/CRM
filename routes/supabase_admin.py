@@ -690,7 +690,7 @@ def admin_mail_queue_list():
                     (st,)
                 ).fetchone()[0]
                 summary[st] = cnt
-    except sqlite3.OperationalError as e:
+    except db.OperationalError as e:
         return jsonify({"ok": False, "error": str(e)[:200]}), 500
     return jsonify({
         "ok": True,
@@ -736,7 +736,7 @@ def admin_mail_queue_retry():
             else:
                 return jsonify({"error": "Nothing to retry — pass ids or retry_all_failed."}), 400
             conn.commit()
-    except sqlite3.OperationalError as e:
+    except db.OperationalError as e:
         return jsonify({"ok": False, "error": str(e)[:200]}), 500
 
     log_audit('EDIT', 'system', f'Mail queue: retried {cnt} email(s) by {session.get("username")}',
@@ -771,7 +771,7 @@ def admin_mail_queue_delete():
             else:
                 return jsonify({"error": "Nothing to delete — pass ids or purge_status."}), 400
             conn.commit()
-    except sqlite3.OperationalError as e:
+    except db.OperationalError as e:
         return jsonify({"ok": False, "error": str(e)[:200]}), 500
 
     log_audit('DELETE', 'system',
@@ -1080,56 +1080,12 @@ def admin_backup_restore():
             return jsonify({'error': str(e)[:200]}), 500
 
     # Real restore
-    import time as _t, datetime as _dt
-    ts = _dt.datetime.now(_dt.timezone.utc).strftime('%Y%m%dT%H%M%SZ')
-    try:
-        # 1) Decrypt backup u temp fajl
-        with open(src_path, 'rb') as f:
-            enc = f.read()
-        try:
-            raw = cipher_suite.decrypt(enc)
-        except Exception as e:
-            return jsonify({'error': 'decrypt_failed',
-                            'detail': f'Wrong vault.key? {type(e).__name__}: {str(e)[:120]}'}), 500
-
-        # 2) Verifikuj da je validan SQLite (integrity check)
-        tmp = _tf.NamedTemporaryFile(delete=False, suffix='.sqlite', dir=backups_dir)
-        tmp.write(raw); tmp.close()
-        try:
-            tconn = _sq.connect(tmp.name, timeout=15.0)
-            integ = tconn.execute('PRAGMA integrity_check').fetchone()
-            tconn.close()
-            if not (integ and integ[0] == 'ok'):
-                _os.remove(tmp.name)
-                return jsonify({'error': 'integrity_check_failed',
-                                'detail': str(integ)}), 500
-        except Exception as e:
-            try: _os.remove(tmp.name)
-            except Exception: pass
-            return jsonify({'error': 'not_valid_sqlite', 'detail': str(e)[:200]}), 500
-
-        # 3) Kvarantiraj postojeci DB kao .pre_restore.<ts>
-        if _os.path.exists(target_path):
-            quarantine = f'{target_path}.pre_restore.{ts}'
-            _os.rename(target_path, quarantine)
-        else:
-            quarantine = None
-
-        # 4) Move decrypted temp na pravo mesto
-        _os.rename(tmp.name, target_path)
-        try: _os.chmod(target_path, 0o600)
-        except Exception: pass
-
-        _log('CRITICAL_ADMIN', 'system',
-             f'DB RESTORE: {target} <- {fname} (previous quarantined at {quarantine})',
-             is_suspicious=True)
-
-        return jsonify({
-            'ok': True, 'target': target, 'restored_from': fname,
-            'quarantined_previous_db': quarantine,
-            'warning': 'Restart the web app to pick up the new DB file.',
-            'timestamp': ts,
-        })
-    except Exception as e:
-        record_error('/api/admin/backup/restore', e)
-        return jsonify({'error': 'restore_failed', 'detail': str(e)[:200]}), 500
+    # NAPOMENA: Od V22.04.05+ aplikacija koristi isključivo PostgreSQL (Supabase).
+    # Restore SQLite backup nije podržan — svi podaci su na Supabase serveru.
+    # Ostavljamo kao placeholder za budući Postgres pg_dump restore.
+    return jsonify({
+        'error': 'not_supported',
+        'detail': 'SQLite backup restore is no longer supported. '
+                  'All data is stored on Supabase PostgreSQL. '
+                  'Use pg_dump/pg_restore for PostgreSQL backups.'
+    }), 400

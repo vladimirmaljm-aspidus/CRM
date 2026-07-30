@@ -920,7 +920,7 @@ def save_offer_pdf_to_vault(offer):
                                 ('offer', year, seq, doc_register_number,
                                  offer.get('id'), 'active', now, 'system'))
                     conn_r.commit()
-                except sqlite3.IntegrityError:
+                except db.IntegrityError:
                     # Ako je race → seq je zauzet, izvuci koji je zaista dodeljen
                     row2 = cur.execute('SELECT docNumber FROM document_register '
                                        'WHERE docType=? AND entityId=?',

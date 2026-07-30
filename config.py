@@ -12,80 +12,64 @@ APP_BASE_URL = os.getenv("APP_BASE_URL", "").rstrip("/")
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
 # ==========================================================
-# DATA_DIR — gde se čuvaju baze, ključevi i otpremljeni fajlovi
+# DATA_DIR — gde se čuvaju uploadovani fajlovi (uploads, portal_uploads)
 # ==========================================================
-# VAŽNO ZA PRODUKCIJU (Render/Heroku i sl. sa efemernim diskom):
-# Postavite env DATA_DIR na putanju TRAJNOG (persistent) diska, npr. /var/data,
-# kako baze, ključevi i uploadovani fajlovi ne bi nestajali pri svakom re-deployu.
-# Lokalno (bez env-a) podrazumevano je BASE_DIR, pa se ponašanje ne menja.
+# NAPOMENA: Od V22.04.05+ aplikacija koristi isključivo PostgreSQL (Supabase) za
+# sve podatke. DATA_DIR se koristi SAMO za lokalne upload fajlove koje Render
+# čuva na ephemeral disku (ili na persistent disku ako je plaćen plan).
+# Baza i ključevi se NE ČUVAJU ovde više — idu iz env varijabli.
 DATA_DIR = os.getenv("DATA_DIR", BASE_DIR)
 os.makedirs(DATA_DIR, exist_ok=True)
 
 # ==========================================================
+# DATABASE — PostgreSQL (Supabase). NEMA SQLite-a nigde.
+# ==========================================================
+# DATABASE_URL je OBAVEZAN. Izgleda otpriliko:
+#   postgresql://postgres.xxxxx:TVOJA-LOZINKA@aws-0-eu-central-1.pooler.supabase.com:6543/postgres
+DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
+
+# DB_FILE / AUDIT_DB_FILE / PORTAL_DB_FILE — ZADRŽANI SAMO kao labele (log tag-ovi)
+# za db.py modul. db.py ih PRIMA ali ih ignoriše — SVI podaci idu na istu Supabase
+# PostgreSQL bazu preko DATABASE_URL. Ovo postoji samo da svi postojeći `import`
+# izjava u route fajlovima nastave da rade bez izmena.
+DB_FILE = os.getenv("DATABASE_URL", "supabase://crm")         # labela, NE fajl
+PORTAL_DB_FILE = os.getenv("DATABASE_URL", "supabase://portal")  # labela, NE fajl
+AUDIT_DB_FILE = os.getenv("DATABASE_URL", "supabase://audit")  # labela, NE fajl
+
+# ==========================================================
 # SECRET KEY (potpisivanje sesijskih kolačića)
 # ==========================================================
-
-INSTANCE_DIR = os.path.join(DATA_DIR, "instance")
-os.makedirs(INSTANCE_DIR, exist_ok=True)
-
-SECRET_KEY_FILE = os.path.join(INSTANCE_DIR, "secret.key")
-
-# Prioritet: 1) env SECRET_KEY  2) sačuvani fajl  3) automatski generisan
-if os.getenv("SECRET_KEY"):
-    SECRET_KEY = os.getenv("SECRET_KEY")
-elif os.path.exists(SECRET_KEY_FILE):
-    with open(SECRET_KEY_FILE, "r", encoding="utf-8") as f:
-        SECRET_KEY = f.read().strip()
-else:
-    SECRET_KEY = secrets.token_urlsafe(64)
-    try:
-        with open(SECRET_KEY_FILE, "w", encoding="utf-8") as f:
-            f.write(SECRET_KEY)
-        os.chmod(SECRET_KEY_FILE, 0o600)
-    except Exception:
-        # Na read-only/efemernom disku fajl možda ne može da se upiše; nastavi sa in-memory ključem.
-        logger.warning("SECRET_KEY se ne može trajno sačuvati. Postavite env SECRET_KEY za stabilne sesije u produkciji.")
-
+# OBAVEZNO iz env varijable za stabilne sesije (Render ephemeral disk).
+SECRET_KEY = os.getenv("SECRET_KEY") or secrets.token_urlsafe(64)
 SECRET_KEY_IS_GENERATED = not bool(os.getenv("SECRET_KEY"))
+if SECRET_KEY_IS_GENERATED:
+    logger.warning("SECRET_KEY nije postavljen iz env var — koristim privremeni "
+                   "(sesije NEĆE opstati nakon restarta). OBAVEZNO postaviti SECRET_KEY.")
 
 # ==========================================================
 # ENCRYPTION KEY (FERNET) — šifruje osetljive podatke (SMTP lozinke, KYC, permisije)
 # ==========================================================
-# Prioritet: 1) env ENCRYPTION_KEY  2) sačuvani fajl  3) automatski generisan.
-# U produkciji BEZ trajnog diska OBAVEZNO postaviti env ENCRYPTION_KEY (base64 Fernet
-# ključ), inače bi se pri svakom deployu generisao novi ključ i postojeći šifrovani
-# podaci više ne bi mogli da se dešifruju.
-KEY_FILE = os.path.join(DATA_DIR, "vault.key")
-
+# OBAVEZNO iz env varijable. Bez nje, pri svakom deploy-u bi se generisao novi
+# ključ i postojeći šifrovani podaci ne bi mogli da se dešifruju.
 _env_enc = os.getenv("ENCRYPTION_KEY")
 if _env_enc:
     ENCRYPTION_KEY = _env_enc.encode() if isinstance(_env_enc, str) else _env_enc
 else:
-    if not os.path.exists(KEY_FILE):
-        _new_key = Fernet.generate_key()
-        try:
-            with open(KEY_FILE, "wb") as f:
-                f.write(_new_key)
-            os.chmod(KEY_FILE, 0o600)
-        except Exception:
-            logger.warning("ENCRYPTION_KEY se ne može trajno sačuvati. Postavite env ENCRYPTION_KEY u produkciji.")
-        ENCRYPTION_KEY = _new_key
-    else:
-        with open(KEY_FILE, "rb") as f:
-            ENCRYPTION_KEY = f.read()
+    # Fallback za lokalni dev — generiše se privremeni ključ (sa upozorenjem).
+    _tmp = Fernet.generate_key()
+    logger.warning("ENCRYPTION_KEY nije postavljen iz env var — koristim privremeni "
+                   "(šifrovani podaci NEĆE opstati nakon restarta). OBAVEZNO postaviti ENCRYPTION_KEY.")
+    ENCRYPTION_KEY = _tmp
 
 # ==========================================================
-# DATABASES
+# ADMIN KORISNIK — kreira se pri prvom startu ako baza nema nijednog user-a
 # ==========================================================
-
-DB_FILE = os.path.join(DATA_DIR, "aspidus_crm.db")
-PORTAL_DB_FILE = os.path.join(DATA_DIR, "aspidus_portal.db")
-AUDIT_DB_FILE = os.path.join(DATA_DIR, "aspidus_audit.db")
+ADMIN_USERNAME = (os.getenv("ADMIN_USERNAME") or "admin").strip()
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD") or ""
 
 # ==========================================================
-# STORAGE
+# STORAGE — lokalni upload folderi (Render ephemeral/persistent disk)
 # ==========================================================
-
 UPLOAD_FOLDER = os.path.join(DATA_DIR, "uploads")
 PORTAL_UPLOAD_FOLDER = os.path.join(DATA_DIR, "portal_uploads")
 
@@ -95,7 +79,6 @@ os.makedirs(PORTAL_UPLOAD_FOLDER, exist_ok=True)
 # ==========================================================
 # UPLOAD LIMITS
 # ==========================================================
-
 MAX_CONTENT_LENGTH = int(os.getenv("MAX_CONTENT_LENGTH", "100")) * 1024 * 1024
 
 ALLOWED_EXTENSIONS = {
@@ -116,26 +99,31 @@ ALLOWED_EXTENSIONS = {
 
 def validate_config():
     """Validate required environment variables for production deployment."""
-    import sys
     warnings = []
-    
+
     if SECRET_KEY_IS_GENERATED:
         warnings.append("SECRET_KEY is auto-generated (not from env). Set SECRET_KEY env var for stable sessions.")
-    
+
     if not os.getenv("ENCRYPTION_KEY"):
         warnings.append("ENCRYPTION_KEY is auto-generated. Set ENCRYPTION_KEY env var or encrypted data will be lost on redeploy.")
-    
+
+    if not os.getenv("DATABASE_URL"):
+        warnings.append("DATABASE_URL is NOT set. The app CANNOT connect to the database without it.")
+
+    if not os.getenv("ADMIN_PASSWORD"):
+        warnings.append("ADMIN_PASSWORD is not set. A random admin password will be generated on each start.")
+
     if os.getenv("USE_SUPABASE_AUTH", "").lower() in ("true", "1", "yes"):
         for var in ("SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_JWT_SECRET"):
             if not os.getenv(var):
                 warnings.append(f"USE_SUPABASE_AUTH is enabled but {var} is not set.")
-    
+
     if os.getenv("USE_SUPABASE_STORAGE", "").lower() in ("true", "1", "yes"):
         for var in ("SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"):
             if not os.getenv(var):
                 warnings.append(f"USE_SUPABASE_STORAGE is enabled but {var} is not set.")
-    
+
     for w in warnings:
         logger.warning(f"CONFIG WARNING: {w}")
-    
+
     return warnings

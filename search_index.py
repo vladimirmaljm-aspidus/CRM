@@ -73,7 +73,7 @@ def rebuild_index() -> Dict:
                         data[table].append(json.loads(raw))
                     except Exception:
                         continue
-            except sqlite3.OperationalError:
+            except db.OperationalError:
                 # tabela ne postoji u ovoj instanci
                 pass
 
@@ -141,7 +141,7 @@ def rebuild_index() -> Dict:
                 conn.execute("INSERT INTO search_index (entity_type, entity_id, title, body) VALUES ('document', ?, ?, ?)",
                              (str(did), title, body))
                 counts['document'] += 1
-        except sqlite3.OperationalError:
+        except db.OperationalError:
             pass  # document_register tabela ne postoji u toj instanci
 
         conn.commit()
@@ -190,7 +190,7 @@ def search(query: str, limit: int = 20, entity_types: List[str] = None) -> List[
     try:
         with _get_conn() as conn:
             rows = conn.execute(sql, params).fetchall()
-    except sqlite3.OperationalError as e:
+    except db.OperationalError as e:
         logger.warning(f'search FTS5 error: {e}')
         return []
 

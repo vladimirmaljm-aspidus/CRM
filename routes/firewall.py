@@ -34,7 +34,7 @@ def get_firewall_status():
     attempts = []
     try:
         with db.connect_raw(AUDIT_DB_FILE) as conn:
-            conn.row_factory = sqlite3.Row
+            conn.row_factory = db._PgRow
             c = conn.cursor()
             c.execute('''SELECT username, ip_address, action, details, timestamp, location, is_suspicious 
                          FROM audit_logs 

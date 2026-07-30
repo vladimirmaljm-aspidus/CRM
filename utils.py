@@ -245,7 +245,7 @@ def log_audit(action, module, details, is_suspicious=False, location="N/A"):
     except Exception:
         # KRITIČNO: log_audit se zove na SVAKOM requestu (login, akcije...).
         # Ako audit baza padne (locked ILI "database disk image is malformed" =
-        # sqlite3.DatabaseError, koji NIJE OperationalError!), NIKAD ne smemo
+        # db.DatabaseError, koji NIJE OperationalError!), NIKAD ne smemo
         # da obučemo request koji je pozvao log_audit. Zato hvatamo sve.
         pass
 

@@ -1,9 +1,8 @@
 import os
 import uuid
 import db
-import sqlite3
 import logging
-from config import DB_FILE, PORTAL_DB_FILE, AUDIT_DB_FILE
+from config import DB_FILE
 
 # Postavljanje logera za bazu
 logger = logging.getLogger(__name__)
@@ -52,43 +51,46 @@ def init_db():
             c.execute('''CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)''')
 
             # MIGRACIJA: lični potpis po korisniku (svako koristi samo svoj potpis na dokumentima).
-            cols = [r[1] for r in c.execute("PRAGMA table_info(users)").fetchall()]
+            # PostgreSQL: koristimo information_schema umesto SQLite PRAGMA table_info.
+            cols = [r[0] for r in c.execute(
+                "SELECT column_name FROM information_schema.columns WHERE table_name='users'"
+            ).fetchall()]
             if 'signature' not in cols:
-                c.execute('ALTER TABLE users ADD COLUMN signature TEXT')
+                c.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS signature TEXT')
             # MIGRACIJA: token_version — broj koji se povećava pri izmeni lozinke ili
             # ručnom odjavi svih sesija; svaki request u login_required proverava da
             # sesija (session.token_version) odgovara aktuelnoj vrednosti korisnika.
             # Ovim promena lozinke odmah izbacuje SVE ranije otvorene sesije.
             if 'token_version' not in cols:
-                c.execute("ALTER TABLE users ADD COLUMN token_version INTEGER DEFAULT 1")
+                c.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS token_version INTEGER DEFAULT 1")
             # MIGRACIJA: last_password_change_at + last_login_country — telemetrija za
             # anomaly detekciju (npr. iznenadna prijava iz druge zemlje).
             if 'last_password_change_at' not in cols:
-                c.execute("ALTER TABLE users ADD COLUMN last_password_change_at TEXT")
+                c.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS last_password_change_at TEXT")
             if 'last_login_country' not in cols:
-                c.execute("ALTER TABLE users ADD COLUMN last_login_country TEXT")
+                c.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login_country TEXT")
             # MIGRACIJA v21: 2FA/TOTP polja. totp_secret je base32 encoded shared
             # secret za HOTP/TOTP RFC 6238 (kompatibilno sa Google Authenticator,
             # Authy, 1Password). totp_enabled je bool zastavica koja bira da li
             # login flow traži drugu proveru. totp_recovery je JSON lista
             # hasovanih recovery kodova za slučaj gubitka telefona.
             if 'totp_secret' not in cols:
-                c.execute("ALTER TABLE users ADD COLUMN totp_secret TEXT")
+                c.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS totp_secret TEXT")
             if 'totp_enabled' not in cols:
-                c.execute("ALTER TABLE users ADD COLUMN totp_enabled INTEGER DEFAULT 0")
+                c.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS totp_enabled INTEGER DEFAULT 0")
             if 'totp_recovery' not in cols:
-                c.execute("ALTER TABLE users ADD COLUMN totp_recovery TEXT")
+                c.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS totp_recovery TEXT")
             # MIGRACIJA v22: profile fields za CRM user-e (koristi ih Preferences panel).
             # full_name / email / phone su prosti string-ovi; notif_prefs je JSON
             # objekat koji koristi ui.js checkAllNotifications da odluci sta prikazati.
             if 'full_name' not in cols:
-                c.execute("ALTER TABLE users ADD COLUMN full_name TEXT")
+                c.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS full_name TEXT")
             if 'email' not in cols:
-                c.execute("ALTER TABLE users ADD COLUMN email TEXT")
+                c.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS email TEXT")
             if 'phone' not in cols:
-                c.execute("ALTER TABLE users ADD COLUMN phone TEXT")
+                c.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS phone TEXT")
             if 'notif_prefs' not in cols:
-                c.execute("ALTER TABLE users ADD COLUMN notif_prefs TEXT")
+                c.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS notif_prefs TEXT")
             # v23 Round F — SECURITY UPGRADES: force password change, lockout, password age policy.
             # must_change_password: admin postavi na 1 → sledeci uspesan login redirectuje user-a
             #   na /profile/security#password i blokira sve druge rute dok se lozinka ne promeni.
@@ -97,11 +99,11 @@ def init_db():
             # password_expires_at: kada je poslednja lozinka postavljena + policy period. Login
             #   ne blokira po isteku (soft warning), samo pokazuje "please change".
             if 'must_change_password' not in cols:
-                c.execute("ALTER TABLE users ADD COLUMN must_change_password INTEGER DEFAULT 0")
+                c.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS must_change_password INTEGER DEFAULT 0")
             if 'locked_until' not in cols:
-                c.execute("ALTER TABLE users ADD COLUMN locked_until TEXT")
+                c.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS locked_until TEXT")
             if 'password_expires_at' not in cols:
-                c.execute("ALTER TABLE users ADD COLUMN password_expires_at TEXT")
+                c.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS password_expires_at TEXT")
 
             # v23 Round F: user_sessions — per-session tracking sa individual revoke.
             # Ranije smo imali samo token_version (globalno "kill all sesija"). Sada svaki
@@ -447,43 +449,34 @@ def init_db():
     except Exception as e:
         logger.error(f"CRITICAL: Greška pri inicijalizaciji glavne baze - {e}")
 
-    # 2. B2B PORTAL BAZA
+    # 2. B2B PORTAL TABELE (ista Supabase baza — više nema posebnih .db fajlova)
+    # Samo-isceljenje/integrity provera je uklonjena: PostgreSQL sam garantuje
+    # konzistentnost, nema "malformed file" scenarija kao kod SQLite-a.
     try:
         with db.connect_raw(PORTAL_DB_FILE, timeout=30.0) as conn2:
-            conn2.execute('PRAGMA journal_mode=WAL;')
-            conn2.execute('PRAGMA synchronous=NORMAL;')
             c2 = conn2.cursor()
-            
+
             # Kreiranje tabela
             c2.execute('''CREATE TABLE IF NOT EXISTS kyc_submissions (id TEXT PRIMARY KEY, partner_id TEXT, token TEXT, data TEXT, submitted_at TEXT)''')
             c2.execute('''CREATE TABLE IF NOT EXISTS portal_products (id TEXT PRIMARY KEY, partner_id TEXT, data TEXT, status TEXT, created_at TEXT)''')
             # Zahtevi partnera za izmenu sopstvenih podataka (email, telefon, adresa...).
             # Ne primenjuju se direktno — admin ih odobrava, tek onda idu u partner profil.
             c2.execute('''CREATE TABLE IF NOT EXISTS profile_change_requests (id TEXT PRIMARY KEY, partner_id TEXT, data TEXT, status TEXT, submitted_at TEXT, reviewed_at TEXT, reviewed_by TEXT)''')
-            
+
             # KREIRANJE INDEKSA (Ključno za optimizaciju i brzinu kada sistem ima mnogo upita)
             c2.execute('''CREATE INDEX IF NOT EXISTS idx_kyc_token ON kyc_submissions(token)''')
             c2.execute('''CREATE INDEX IF NOT EXISTS idx_kyc_partner ON kyc_submissions(partner_id)''')
             c2.execute('''CREATE INDEX IF NOT EXISTS idx_portal_products_partner ON portal_products(partner_id)''')
-            
+
             conn2.commit()
     except Exception as e:
-        logger.error(f"CRITICAL: Greška pri inicijalizaciji portal baze - {e}")
+        logger.error(f"CRITICAL: Greška pri inicijalizaciji portal tabela - {e}")
 
-    # 3. VOJNA AUDIT BAZA
-    # SAMO-ISCELJENJE: ako je audit baza malformed (npr. prekinut upis tokom
-    # deploy-a), NE blokiramo ceo startup. Audit logovi su zamenljivi (istorija
-    # pristupa, ne poslovni podaci), pa oštećenu bazu premeštamo u
-    # .malformed.<ts> backup i pravimo novu. Ovo omogućava da se aplikacija
-    # sama oporavi na sledeći Reload umesto da klijenti stoje blokirani.
-    def _init_audit(recreate_on_corrupt=True):
+    # 3. AUDIT LOG TABELA (ista Supabase baza)
+    # Ranije je audit bio poseban SQLite fajl sa "malformed file" self-heal logikom.
+    # PostgreSQL to ne zahteva — CREATE TABLE IF NOT EXISTS je dovoljan i idempotentan.
+    try:
         with db.connect_raw(AUDIT_DB_FILE, timeout=30.0) as conn3:
-            conn3.execute('PRAGMA journal_mode=WAL;')
-            conn3.execute('PRAGMA synchronous=NORMAL;')
-            # integrity_check baca / vraća loše ako je fajl malformed
-            integ = conn3.execute('PRAGMA integrity_check').fetchone()
-            if integ and integ[0] != 'ok' and recreate_on_corrupt:
-                raise sqlite3.DatabaseError(f'audit integrity: {integ[0]}')
             c3 = conn3.cursor()
             c3.execute('''CREATE TABLE IF NOT EXISTS audit_logs
                          (id TEXT PRIMARY KEY, user_id TEXT, username TEXT, action TEXT, module TEXT, details TEXT, ip_address TEXT, user_agent TEXT, timestamp TEXT, is_suspicious BOOLEAN, location TEXT)''')
@@ -491,24 +484,5 @@ def init_db():
             c3.execute('''CREATE INDEX IF NOT EXISTS idx_audit_user ON audit_logs(username)''')
             c3.execute('''CREATE INDEX IF NOT EXISTS idx_audit_suspicious ON audit_logs(is_suspicious)''')
             conn3.commit()
-
-    try:
-        _init_audit()
     except Exception as e:
-        # Malformed ili nedostupna audit baza — quarantine + fresh recreate
-        import time as _t
-        try:
-            if os.path.exists(AUDIT_DB_FILE):
-                quarantine = f'{AUDIT_DB_FILE}.malformed.{int(_t.time())}'
-                os.rename(AUDIT_DB_FILE, quarantine)
-                logger.error(f'AUDIT DB malformed ({e}) — premešten u {quarantine}, pravim novu praznu.')
-            # Ukloni WAL/SHM ostatke da nova baza krene čista
-            for suffix in ('-wal', '-shm'):
-                p = AUDIT_DB_FILE + suffix
-                if os.path.exists(p):
-                    try: os.remove(p)
-                    except Exception: pass
-            _init_audit(recreate_on_corrupt=False)
-            logger.warning('AUDIT DB uspešno rekreirana (prazna). Stara istorija je u .malformed backup fajlu.')
-        except Exception as e2:
-            logger.error(f"CRITICAL: Ne mogu ni da rekreiram audit bazu: {e2}")
+        logger.error(f"CRITICAL: Greška pri inicijalizaciji audit_log tabele - {e}")

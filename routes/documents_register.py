@@ -144,7 +144,7 @@ def issue_number():
                  session.get('username') or 'system')
             )
             con.commit()
-        except sqlite3.IntegrityError as e:
+        except db.IntegrityError as e:
             # Duplikat UNIQUE(docNumber) → race → pokušaj još jednom
             logger.warning(f'Duplicate docNumber, retrying: {e}')
             seq = _next_seq(cur, doc_type, year)
@@ -394,7 +394,7 @@ def issue_document_for_deal(deal_id):
                 (doc_type, year, seq, number, deal_id, 'active', now, username)
             )
             con.commit()
-        except sqlite3.IntegrityError as e:
+        except db.IntegrityError as e:
             # Race na UNIQUE(docNumber) - probaj jos jednom sa novim seq
             logger.warning(f'Duplicate docNumber for deal {deal_id} {doc_type}: {e}')
             seq = _next_seq(cur, doc_type, year)

@@ -98,7 +98,7 @@ def reports_list():
                     "ORDER BY updated_at DESC",
                     (uid,)
                 ).fetchall()
-    except sqlite3.OperationalError as e:
+    except db.OperationalError as e:
         return jsonify({'error': str(e)[:200]}), 500
     return jsonify({
         'reports': [{
@@ -142,7 +142,7 @@ def reports_create():
                 (rid, session.get('user_id'), title, description, sql,
                  chart_type, 1 if is_shared else 0, now, now)
             )
-    except sqlite3.OperationalError as e:
+    except db.OperationalError as e:
         return jsonify({'error': str(e)[:200]}), 500
     log_audit('CREATE', 'reports', f'Custom report "{title}" ({chart_type})')
     return jsonify({'id': rid, 'title': title, 'chart_type': chart_type})
@@ -159,7 +159,7 @@ def reports_get(rid):
                 "chart_type, is_shared, created_at, updated_at FROM custom_reports WHERE id=?",
                 (rid,)
             ).fetchone()
-    except sqlite3.OperationalError as e:
+    except db.OperationalError as e:
         return jsonify({'error': str(e)[:200]}), 500
     if not r:
         return jsonify({'error': 'not_found'}), 404
@@ -182,7 +182,7 @@ def reports_delete(rid):
     try:
         with db.connect_raw(DB_FILE) as conn:
             n = conn.execute("DELETE FROM custom_reports WHERE id=?", (rid,)).rowcount
-    except sqlite3.OperationalError as e:
+    except db.OperationalError as e:
         return jsonify({'error': str(e)[:200]}), 500
     return jsonify({'deleted': n})
 
@@ -198,7 +198,7 @@ def reports_run(rid):
                 "SELECT owner_user_id, sql_query, chart_type, is_shared, title "
                 "FROM custom_reports WHERE id=?", (rid,)
             ).fetchone()
-    except sqlite3.OperationalError as e:
+    except db.OperationalError as e:
         return jsonify({'error': str(e)[:200]}), 500
     if not r:
         return jsonify({'error': 'not_found'}), 404
@@ -217,14 +217,15 @@ def reports_run(rid):
     # Izvrsi read-only konekciju
     start = time.time()
     try:
-        # SQLite read-only URI mode
-        uri = f'file:{DB_FILE}?mode=ro'
-        conn = sqlite3.connect(uri, uri=True, timeout=10.0)  # NOTE: in-memory/attach DB — cannot use db.connect_raw()
-        conn.execute('PRAGMA query_only = 1')
-        cur = conn.execute(sql + ' LIMIT 5000' if 'LIMIT' not in sql.upper() else sql)
-        columns = [d[0] for d in cur.description] if cur.description else []
-        rows = cur.fetchall()
-        conn.close()
+        # PostgreSQL: koristimo pool konekciju. SQL je vec strict-validiran kroz
+        # _validate_sql() (odbija INSERT/UPDATE/DELETE/DROP/ALTER/...). Dodajemo
+        # LIMIT radi bezbednosti ukoliko ga nema. `?` placeholderi se automatski
+        # konvertuju u db.py, ali ovde je SQL bez parametara pa je bezbedno.
+        with db.connect_raw(DB_FILE) as conn:
+            final_sql = sql + ' LIMIT 5000' if 'LIMIT' not in sql.upper() else sql
+            cur = conn.execute(final_sql)
+            columns = [d[0] for d in cur.description] if cur.description else []
+            rows = cur.fetchall()
     except Exception as e:
         return jsonify({
             'error': 'query_failed',

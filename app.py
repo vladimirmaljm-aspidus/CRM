@@ -60,7 +60,10 @@ app.config['PORTAL_UPLOAD_FOLDER'] = PORTAL_UPLOAD_FOLDER
 # BRUTALNA ZAŠTITA SESIJE - VOJNI STANDARD
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=2)
 app.config['SESSION_COOKIE_HTTPONLY'] = True
-app.config['SESSION_COOKIE_SAMESITE'] = 'Strict'
+# SameSite=Lax (ne 'Strict') — 'Strict' odbacuje sesijski cookie pri nekim
+# window.location.reload() / cross-sub-navigacijama na Renderu i izbacivalo je
+# korisnika odmah nakon uspešnog login-a. 'Lax' i dalje štiti od CSRF-a.
+app.config['SESSION_COOKIE_SAMESITE'] = os.getenv('SESSION_COOKIE_SAMESITE', 'Lax')
 
 # Sesijski kolačić sa Secure flagom se NE ŠALJE preko nešifrovanog HTTP-a (npr.
 # http://localhost), pa bi uključivanje ovoga u lokalnom razvoju "odjavljivalo"

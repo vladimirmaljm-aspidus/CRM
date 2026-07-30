@@ -134,7 +134,7 @@ def email_queue_view():
     from config import DB_FILE
     try:
         conn = db.connect_raw(DB_FILE)
-        conn.row_factory = sqlite3.Row
+        conn.row_factory = db._PgRow
         # Kreiraj tabelu ako još ne postoji (prvi start)
         conn.execute('''CREATE TABLE IF NOT EXISTS email_queue (
             id TEXT PRIMARY KEY, recipient TEXT NOT NULL, subject TEXT,
