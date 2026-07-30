@@ -303,7 +303,7 @@ def _ensure_pool():
         # minconn=1, maxconn=8 — dovoljno za Render free (2 gunicorn workera).
         # Supabase Transaction pooler (port 6543) i sam kešira konekcije.
         try:
-            _pool = _pgpool.ThreadedConnectionPool(1, 8, dsn)
+            _pool = _pgpool.ConnectionPool(dsn, min_size=1, max_size=8)
             logger.info("DB POOL: uspešno konektovan na Supabase PostgreSQL.")
         except Exception as e:
             logger.error(f"DB POOL: ne mogu da se konektujem na bazu: {e}")
