@@ -170,8 +170,6 @@ def save_single_item(key):
         conn = get_db_connection()
         c = conn.cursor()
         
-        c.execute('BEGIN TRANSACTION;')
-        
         c.execute('SELECT role, permissions FROM users WHERE id=?', (session['user_id'],))
         user_row = c.fetchone()
         if not user_row:
@@ -320,8 +318,7 @@ def delete_single_item(key, item_id):
     try:
         conn = get_db_connection()
         c = conn.cursor()
-        c.execute('BEGIN TRANSACTION;')
-        
+
         c.execute('SELECT role, permissions FROM users WHERE id=?', (session['user_id'],))
         user_row = c.fetchone()
         if not user_row:
@@ -378,9 +375,7 @@ def save_data(key):
     try:
         conn = get_db_connection()
         c = conn.cursor()
-        
-        c.execute('BEGIN TRANSACTION;')
-        
+
         tables = list(ALLOWED_DATA_TABLES)
         
         if key in tables:
@@ -462,7 +457,6 @@ def create_deal_from_offer(offer_id):
     conn = get_db_connection()
     try:
         c = conn.cursor()
-        c.execute('BEGIN TRANSACTION;')
         c.execute("SELECT data FROM offers WHERE id=?", (offer_id,))
         row = c.fetchone()
         if not row:
@@ -750,7 +744,6 @@ def restore_offer_version(offer_id, version_id):
     conn = get_db_connection()
     try:
         c = conn.cursor()
-        c.execute('BEGIN TRANSACTION;')
         c.execute("SELECT data FROM offers WHERE id=?", (offer_id,))
         row = c.fetchone()
         if not row:
@@ -1173,7 +1166,7 @@ def deal_timeline(deal_id):
         try:
             for doc_row in c.execute(
                 'SELECT docType, docNumber, revision, status, issuedAt, issuedBy '
-                'FROM document_register WHERE entityId=? OR docNumber LIKE ? '
+                'FROM document_register WHERE entityId=? OR docNumber ILIKE ? '
                 'ORDER BY issuedAt ASC',
                 (deal_id, f'%{contract_id}%' if contract_id else '__nope__')
             ):
@@ -1214,7 +1207,7 @@ def deal_timeline(deal_id):
             try:
                 rows = cur_a.execute(
                     "SELECT action, module, details, username, timestamp FROM audit_log "
-                    "WHERE details LIKE ? OR details LIKE ? "
+                    "WHERE details ILIKE ? OR details ILIKE ? "
                     "ORDER BY timestamp ASC LIMIT 100",
                     (f'%{needle}%', f'%{deal_id}%')
                 ).fetchall()

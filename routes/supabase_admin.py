@@ -264,10 +264,16 @@ def admin_health_api():
 def public_health():
     """Public heartbeat — bez auth, minimalan info (za uptime monitor)."""
     try:
-        import os
         from config import DB_FILE
+        ok = False
+        try:
+            with db.connect_raw(DB_FILE) as _c:
+                _c.execute("SELECT 1").fetchone()
+            ok = True
+        except Exception:
+            ok = False
         return jsonify({
-            "ok": os.path.exists(DB_FILE),
+            "ok": ok,
             "service": "aspidus-crm",
             "timestamp": time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()),
         })
@@ -370,23 +376,23 @@ def supabase_status():
         "DB_BACKEND": os.environ.get("DB_BACKEND", "rest"),
     }
 
-    # SQLite brojevi
+    # PostgreSQL brojevi (preko pool-a — zamenjuje sqlite_master)
     sqlite_counts = {}
     for label, path in (("crm", DB_FILE), ("portal", PORTAL_DB_FILE), ("audit", AUDIT_DB_FILE)):
-        if os.path.exists(path):
-            try:
-                conn = db.connect_raw(path, timeout=5.0)
-                for (tname,) in conn.execute(
-                    "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
-                ).fetchall():
-                    try:
-                        cnt = conn.execute(f'SELECT COUNT(*) FROM "{tname}"').fetchone()[0]
-                        sqlite_counts[f"{label}.{tname}"] = int(cnt)
-                    except Exception:
-                        pass
-                conn.close()
-            except Exception as e:
-                sqlite_counts[f"{label}.error"] = str(e)
+        try:
+            conn = db.connect_raw(path, timeout=5.0)
+            for (tname,) in conn.execute(
+                "SELECT table_name FROM information_schema.tables "
+                "WHERE table_schema='public' AND table_type='BASE TABLE' ORDER BY table_name"
+            ).fetchall():
+                try:
+                    cnt = conn.execute(f'SELECT COUNT(*) FROM "{tname}"').fetchone()[0]
+                    sqlite_counts[f"{label}.{tname}"] = int(cnt)
+                except Exception:
+                    pass
+            conn.close()
+        except Exception as e:
+            sqlite_counts[f"{label}.error"] = str(e)
 
     # Supabase brojevi (samo ako je kljuc podesen)
     supabase_counts = {}
@@ -949,23 +955,17 @@ def admin_backup_trigger():
         created = []
         errors = []
         offsite = []
-        for db_path in (DB_FILE, PORTAL_DB_FILE, AUDIT_DB_FILE):
-            if not _os.path.exists(db_path):
-                continue
-            tmp_copy = _os.path.join(backups_dir, f'.tmp_manual_{_os.path.basename(db_path)}')
+        from utils import _pg_dump_to_bytes
+        for label, db_path in (('crm', DB_FILE), ('portal', PORTAL_DB_FILE), ('audit', AUDIT_DB_FILE)):
             try:
-                src_conn = db.connect_raw(db_path, timeout=30.0)
-                dst_conn = db.connect_raw(tmp_copy, timeout=30.0)
-                with dst_conn:
-                    src_conn.backup(dst_conn)
-                dst_conn.close(); src_conn.close()
-                with open(tmp_copy, 'rb') as f:
-                    raw = f.read()
+                raw = _pg_dump_to_bytes(db_path)
+                if not raw:
+                    errors.append({'db': label, 'error': 'empty dump'})
+                    continue
                 enc = cipher_suite.encrypt(raw)
-                out = _os.path.join(backups_dir, f'{_os.path.basename(db_path)}.{ts}.MANUAL.fernet')
+                out = _os.path.join(backups_dir, f'{label}.{ts}.MANUAL.fernet')
                 with open(out, 'wb') as f:
                     f.write(enc)
-                _os.remove(tmp_copy)
                 try: _os.chmod(out, 0o600)
                 except Exception: pass
                 created.append({'file': _os.path.basename(out), 'size_bytes': len(enc)})
@@ -980,10 +980,7 @@ def admin_backup_trigger():
                     except Exception as ee:
                         offsite.append({'file': _os.path.basename(out), 'error': str(ee)[:120]})
             except Exception as e:
-                errors.append({'db': _os.path.basename(db_path), 'error': str(e)[:120]})
-                try:
-                    if _os.path.exists(tmp_copy): _os.remove(tmp_copy)
-                except Exception: pass
+                errors.append({'db': label, 'error': str(e)[:120]})
         log_audit('CREATE', 'system',
                   f'Manual backup triggered by {session.get("username")}: {len(created)} files, {len(errors)} errors',
                   is_suspicious=False)

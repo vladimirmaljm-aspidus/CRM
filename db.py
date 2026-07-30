@@ -192,6 +192,10 @@ class _PgCursor:
     def fetchmany(self, size=1):
         return [_PgRow(r) for r in self._c.fetchmany(size)]
 
+    def copy_expert(self, sql, file, **kwargs):
+        """Delegira na raw psycopg cursor (za COPY operacije — backup/restore)."""
+        return self._c.copy_expert(sql, file, **kwargs)
+
     @property
     def rowcount(self):
         return self._c.rowcount

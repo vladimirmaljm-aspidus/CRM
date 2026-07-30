@@ -927,7 +927,6 @@ def portal_upload(token):
         import threading
         def _extract_bg(pairs, pid):
             try:
-                import sqlite3 as _sq
                 from utils_ocr import extract_text as _extr, summarize_text as _summ
                 import uuid as _uuid, time as _time
                 for local_path, url in pairs:
@@ -936,7 +935,7 @@ def portal_upload(token):
                         if not text:
                             continue
                         preview = _summ(text, max_len=500)
-                        with _sq.connect(DB_FILE, timeout=15.0) as _c:
+                        with db.connect_raw(DB_FILE, timeout=15.0) as _c:
                             _c.execute(
                                 "INSERT OR REPLACE INTO file_text "
                                 "(id, file_url, partner_id, filename, text_preview, full_text, char_count, extracted_at) "
@@ -945,6 +944,7 @@ def portal_upload(token):
                                  preview, text, len(text),
                                  _time.strftime('%Y-%m-%dT%H:%M:%SZ', _time.gmtime()))
                             )
+                            _c.commit()
                     except Exception:
                         pass
             except Exception:

@@ -591,12 +591,50 @@ def _email_queue_loop():
 #  AUTOMATSKI ŠIFROVANI BACKUP BAZE — dnevni snapshot, zadrži poslednjih 14
 # ==========================================================
 
+def _pg_dump_to_bytes(db_path):
+    """Pravi SQL dump svih tabela iz PostgreSQL baze kao bytes.
+    Koristi COPY ... TO STDOUT za svaku tabelu. Vraća bytes sa
+    CSV sadržajem svake tabele, ili b'' ako ne uspe."""
+    import io as _io
+    try:
+        buf = _io.BytesIO()
+        with db.connect_raw(db_path) as conn:
+            cur = conn.cursor()
+            # Dohvati sve tabele iz public schema
+            cur.execute("""
+                SELECT table_name FROM information_schema.tables
+                WHERE table_schema = 'public' AND table_type = 'BASE TABLE'
+                ORDER BY table_name
+            """)
+            tables = [r[0] for r in cur.fetchall()]
+            for tname in tables:
+                try:
+                    # Header sa imenom tabele radi lakšeg restore-a
+                    buf.write(f"-- TABLE: {tname}\n".encode('utf-8'))
+                    # Kopiraj sadržaj tabele kao CSV (može se reimportovati sa COPY FROM)
+                    cur.copy_expert(
+                        f"COPY \"{tname}\" TO STDOUT WITH (FORMAT csv, HEADER true)",
+                        buf
+                    )
+                    buf.write(b'\n\n')  # separator između tabela
+                except Exception as te:
+                    _util_logger.warning(f'_pg_dump_to_bytes: table {tname} failed: {te}')
+                    buf.write(f"-- ERROR on {tname}: {te}\n\n".encode('utf-8'))
+        return buf.getvalue()
+    except Exception as e:
+        _util_logger.warning(f'_pg_dump_to_bytes failed: {e}')
+        return b''
+
+
 def _backup_loop():
-    """Jedanput dnevno pravi Fernet-šifrovan snapshot svih .db fajlova i briše
-    starije od 14 dana. Ako DATA_DIR/backups direktorijum nije upisiv, tiho
-    preskoči — housekeeping se ne sme sabotirati zbog produkcionih FS problema.
-    Backup je šifrovan istim ENCRYPTION_KEY-om koji se koristi za Fernet vault
-    upisa u DB, tako da napadač koji dobije samo snapshot ne može da pročita."""
+    """Jednom dnevno pravi Fernet-šifrovan SQL dump svih baza i briše
+    starije od 14 dana. Koristi pg_dump pristup (COPY ... TO STDOUT) jer
+    PostgreSQL nije fajl-based (stari SQLite backup() API ne postoji).
+    Ako DATA_DIR/backups nije upisiv, tiho preskoči — housekeeping se
+    ne sme sabotirati zbog produkcionih FS problema.
+    Backup je šifrovan istim ENCRYPTION_KEY-om koji se koristi za Fernet
+    vault upisa u DB, tako da napadač koji dobije samo snapshot ne može
+    da pročita."""
     from config import DB_FILE, PORTAL_DB_FILE, AUDIT_DB_FILE, DATA_DIR
     backups_dir = os.path.join(DATA_DIR, 'backups')
     try:
@@ -608,26 +646,17 @@ def _backup_loop():
     while True:
         try:
             ts = datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%SZ')
-            for db_path in (DB_FILE, PORTAL_DB_FILE, AUDIT_DB_FILE):
-                if not os.path.exists(db_path):
-                    continue
-                # Bezbedan snapshot — sqlite backup API garantuje konzistentnost
-                # čak i dok drugi procesi pišu u WAL.
-                tmp_copy = os.path.join(backups_dir, f'.tmp_{os.path.basename(db_path)}')
+            for label, db_path in (('crm', DB_FILE), ('portal', PORTAL_DB_FILE), ('audit', AUDIT_DB_FILE)):
                 try:
-                    src_conn = db.connect_raw(db_path, timeout=30.0)
-                    dst_conn = db.connect_raw(tmp_copy, timeout=30.0)
-                    with dst_conn:
-                        src_conn.backup(dst_conn)
-                    dst_conn.close()
-                    src_conn.close()
-                    with open(tmp_copy, 'rb') as f:
-                        raw = f.read()
+                    # PostgreSQL backup: izvezi sve tabele kao CSV preko COPY
+                    raw = _pg_dump_to_bytes(db_path)
+                    if not raw:
+                        _util_logger.warning(f'BACKUP: empty dump for {label}, skipping')
+                        continue
                     enc = cipher_suite.encrypt(raw)
-                    out = os.path.join(backups_dir, f'{os.path.basename(db_path)}.{ts}.fernet')
+                    out = os.path.join(backups_dir, f'{label}.{ts}.fernet')
                     with open(out, 'wb') as f:
                         f.write(enc)
-                    os.remove(tmp_copy)
                     try:
                         os.chmod(out, 0o600)
                     except Exception:
@@ -647,11 +676,7 @@ def _backup_loop():
                         except Exception as _e:
                             _util_logger.warning(f'BACKUP: off-site mirror failed: {_e}')
                 except Exception:
-                    _util_logger.warning(f'BACKUP: snapshot failed for {db_path}', exc_info=True)
-                    try:
-                        if os.path.exists(tmp_copy): os.remove(tmp_copy)
-                    except Exception:
-                        pass
+                    _util_logger.warning(f'BACKUP: snapshot failed for {label}', exc_info=True)
 
             # Retention: obriši backup-ove starije od 14 dana
             cutoff_s = time.time() - 14 * 86400

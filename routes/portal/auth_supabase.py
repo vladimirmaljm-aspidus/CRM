@@ -116,14 +116,12 @@ def supabase_auth_exchange():
     #     ranije generisao token URL). Bez tokena downstream API-ji neće raditi.
     token = partner.get('portalToken')
     if not token:
-        import json as _json
-        import sqlite3 as _sql
         import secrets as _sec
         from config import DB_FILE as _DBF
         token = _sec.token_urlsafe(32)
         partner['portalToken'] = token
         partner.setdefault('isPortalActive', True)
-        conn = _sql.connect(_DBF, timeout=30.0)
+        conn = db.connect_raw(_DBF, timeout=30.0)
         try:
             conn.execute('UPDATE partners SET data=? WHERE id=?',
                          (encrypt_data(partner), partner_id))
@@ -232,14 +230,12 @@ def supabase_set_password():
     # Uveri se da postoji portalToken (kao u exchange-u)
     token = partner.get('portalToken')
     if not token:
-        import json as _json
-        import sqlite3 as _sql
         import secrets as _sec
         from config import DB_FILE as _DBF
         token = _sec.token_urlsafe(32)
         partner['portalToken'] = token
         partner.setdefault('isPortalActive', True)
-        conn = _sql.connect(_DBF, timeout=30.0)
+        conn = db.connect_raw(_DBF, timeout=30.0)
         try:
             conn.execute('UPDATE partners SET data=? WHERE id=?',
                          (encrypt_data(partner), partner_id))
@@ -313,14 +309,12 @@ def supabase_signin_password():
 
     token = partner.get('portalToken')
     if not token:
-        import json as _json
-        import sqlite3 as _sql
         import secrets as _sec
         from config import DB_FILE as _DBF
         token = _sec.token_urlsafe(32)
         partner['portalToken'] = token
         partner.setdefault('isPortalActive', True)
-        conn = _sql.connect(_DBF, timeout=30.0)
+        conn = db.connect_raw(_DBF, timeout=30.0)
         try:
             conn.execute('UPDATE partners SET data=? WHERE id=?',
                          (encrypt_data(partner), partner_id))

@@ -22,25 +22,37 @@ def _is_admin():
 
 
 def _db_stats(path):
-    if not os.path.exists(path):
-        return {'exists': False}
+    """PostgreSQL stats — path je labela, ne fajl."""
     try:
-        st = os.stat(path)
         row_counts = {}
+        db_size = None
         with db.connect_raw(path, timeout=10.0) as conn:
             c = conn.cursor()
-            c.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")
+            # Veličina baze (PostgreSQL native)
+            try:
+                size_row = c.execute(
+                    "SELECT pg_database_size(current_database())"
+                ).fetchone()
+                if size_row:
+                    db_size = size_row[0]
+            except Exception:
+                pass
+            # Lista tabela iz public schema (zamenjuje sqlite_master)
+            c.execute("""
+                SELECT table_name FROM information_schema.tables
+                WHERE table_schema = 'public' AND table_type = 'BASE TABLE'
+                ORDER BY table_name
+            """)
             tables = [r[0] for r in c.fetchall()]
             for t in tables:
                 try:
-                    row_counts[t] = c.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0]
+                    row_counts[t] = c.execute(f'SELECT COUNT(*) FROM "{t}"').fetchone()[0]
                 except Exception:
                     row_counts[t] = None
         return {
             'exists': True,
-            'size_bytes': st.st_size,
-            'size_mb': round(st.st_size / 1024 / 1024, 2),
-            'modified_at': datetime.fromtimestamp(st.st_mtime, tz=timezone.utc).isoformat().replace('+00:00', 'Z'),
+            'size_bytes': db_size or 0,
+            'size_mb': round((db_size or 0) / 1024 / 1024, 2),
             'tables': row_counts,
         }
     except Exception as e:
@@ -159,24 +171,22 @@ def backup_now():
 
     def _one_shot():
         try:
+            from utils import _pg_dump_to_bytes
             backups_dir = os.path.join(DATA_DIR, 'backups')
             os.makedirs(backups_dir, exist_ok=True)
             ts = datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')
-            for db_path in (DB_FILE, PORTAL_DB_FILE, AUDIT_DB_FILE):
-                if not os.path.exists(db_path):
-                    continue
-                tmp = os.path.join(backups_dir, f'.tmp_{os.path.basename(db_path)}')
-                src = db.connect_raw(db_path, timeout=30.0)
-                dst = db.connect_raw(tmp, timeout=30.0)
-                with dst:
-                    src.backup(dst)
-                dst.close(); src.close()
-                with open(tmp, 'rb') as f: raw = f.read()
-                out = os.path.join(backups_dir, f'{os.path.basename(db_path)}.{ts}.MANUAL.fernet')
-                with open(out, 'wb') as f: f.write(cipher_suite.encrypt(raw))
-                os.remove(tmp)
-                try: os.chmod(out, 0o600)
-                except Exception: pass
+            for label, db_path in (('crm', DB_FILE), ('portal', PORTAL_DB_FILE), ('audit', AUDIT_DB_FILE)):
+                try:
+                    raw = _pg_dump_to_bytes(db_path)
+                    if not raw:
+                        continue
+                    out = os.path.join(backups_dir, f'{label}.{ts}.MANUAL.fernet')
+                    with open(out, 'wb') as f:
+                        f.write(cipher_suite.encrypt(raw))
+                    try: os.chmod(out, 0o600)
+                    except Exception: pass
+                except Exception:
+                    pass
         except Exception:
             pass
 

@@ -423,7 +423,7 @@ def document_search():
         with db.connect_raw(DB_FILE) as conn:
             rows = conn.execute(
                 "SELECT file_url, partner_id, filename, text_preview, extracted_at "
-                "FROM file_text WHERE full_text LIKE ? COLLATE NOCASE "
+                "FROM file_text WHERE full_text ILIKE ? "
                 "ORDER BY extracted_at DESC LIMIT 50",
                 (f'%{q}%',)
             ).fetchall()

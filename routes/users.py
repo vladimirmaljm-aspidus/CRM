@@ -49,8 +49,7 @@ def manage_users():
         try:
             conn = get_db_connection()
             c = conn.cursor()
-            c.execute('BEGIN TRANSACTION;')
-            
+
             if user_id:
                 c.execute('SELECT id FROM users WHERE LOWER(username) = LOWER(?) AND id != ?', (new_username, user_id))
             else:
@@ -126,7 +125,6 @@ def delete_user(user_id):
     try:
         conn = get_db_connection()
         c = conn.cursor()
-        c.execute('BEGIN TRANSACTION;')
         c.execute('DELETE FROM users WHERE id=?', (user_id,))
         conn.commit()
         

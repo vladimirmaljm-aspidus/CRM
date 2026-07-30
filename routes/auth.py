@@ -225,7 +225,7 @@ def login():
                 _pattern = f"%Failed login attempt: {username}.%"
                 _fail_count = _ac.execute(
                     "SELECT COUNT(*) FROM audit_logs WHERE action='SECURITY' "
-                    "AND details LIKE ? AND timestamp>=?",
+                    "AND details ILIKE ? AND timestamp>=?",
                     (_pattern, cutoff)
                 ).fetchone()[0]
             if _fail_count + 1 >= max_attempts:

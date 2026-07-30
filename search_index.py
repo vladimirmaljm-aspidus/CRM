@@ -1,15 +1,16 @@
-"""SQLite FTS5 unified search — brza globalna pretraga.
+"""PostgreSQL tsvector unified search — brza globalna pretraga.
 
-Šta radi: gradi jedan FTS5 virtuelni tabela `search_index` koji sadrži
-tekst iz svih pretraživih entiteta (partneri, proizvodi, dilovi, ponude,
-dokumenti). Poziv `search(query, limit=20)` vraća listu match-eva
-rangovanih po BM25 relevance-u.
+Šta radi: održava jednu tabelu `search_index` sa tsvector kolonom za
+full-text pretragu preko svih entiteta (partneri, proizvodi, dilovi,
+ponude, dokumenti). Poziv `search(query, limit=20)` vraća listu match-eva
+rangovanih po ts_rank relevance-u.
 
-Zašto FTS5:
-  - Podržava tokenizaciju, prefix-match (npr. "aspi*" → aspidus)
-  - Ranker BM25 daje bolje rezultate od LIKE '%...%'
-  - 10x-100x brže od LIKE nad većim setovima podataka (>10k entiteta)
-  - Već je uključeno u standardnu Python distribuciju (compile-time flag)
+Zašto tsvector + GIN:
+  - PostgreSQL native full-text search (zamenjuje SQLite FTS5)
+  - Podržava prefix-match (npr. "aspi:*" → aspidus) preko to_tsquery
+  - ts_rank daje relevantnost
+  - GIN index daje 10x-100x brže pretrage od LIKE '%...%'
+  - ts_headline automatski highlight-uje match
 
 Sinhronizacija: rebuild_index() briše i ponovo puni index iz izvornih
 tabela. Poziva se:
@@ -20,7 +21,6 @@ tabela. Poziva se:
 import db
 import json
 import logging
-import sqlite3
 from typing import List, Dict
 
 from config import DB_FILE
@@ -28,25 +28,37 @@ from config import DB_FILE
 logger = logging.getLogger(__name__)
 
 
-_SCHEMA = """
-CREATE VIRTUAL TABLE IF NOT EXISTS search_index USING fts5(
-    entity_type UNINDEXED,       -- 'partner' | 'product' | 'deal' | 'offer' | 'document'
-    entity_id   UNINDEXED,       -- ID zapisa za dubinski link
-    title,                       -- glavno ime (npr. companyName, product.name)
-    body,                        -- konkatenacija svih pretraživih polja
-    tokenize = 'porter unicode61'
-);
-"""
-
-
 def _get_conn():
     conn = db.connect_raw(DB_FILE)
     return conn
 
 
+def _to_tsvector_expr():
+    """Vraća SQL izraz koji pravi tsvector iz title + body kolona."""
+    return "to_tsvector('simple', coalesce(title, '') || ' ' || coalesce(body, ''))"
+
+
 def _ensure_schema():
+    """Kreira tabelu i GIN index ako ne postoje. Idempotentno."""
     with _get_conn() as conn:
-        conn.executescript(_SCHEMA)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS search_index (
+                id SERIAL PRIMARY KEY,
+                entity_type TEXT NOT NULL,
+                entity_id   TEXT NOT NULL,
+                title       TEXT,
+                body        TEXT,
+                tsv         tsvector
+            )
+        """)
+        conn.execute("""
+            CREATE INDEX IF NOT EXISTS search_index_tsv_idx
+            ON search_index USING GIN(tsv)
+        """)
+        conn.execute("""
+            CREATE INDEX IF NOT EXISTS search_index_entity_type_idx
+            ON search_index(entity_type)
+        """)
         conn.commit()
 
 
@@ -59,6 +71,12 @@ def rebuild_index() -> Dict:
 
     with _get_conn() as conn:
         conn.execute('DELETE FROM search_index')
+
+        # Reset SERIAL sequence posle DELETE-a
+        try:
+            conn.execute("SELECT setval(pg_get_serial_sequence('search_index', 'id'), 1, false)")
+        except Exception:
+            pass
 
         # Podaci žive u pojedinačnim tabelama (partners, products, deals, offers)
         # gde je svaki red (id TEXT PRIMARY KEY, data TEXT) — JSON payload u data.
@@ -77,6 +95,8 @@ def rebuild_index() -> Dict:
                 # tabela ne postoji u ovoj instanci
                 pass
 
+        tsv_expr = _to_tsvector_expr()
+
         for p in (data.get('partners') or []):
             pid = p.get('id')
             if not pid: continue
@@ -92,8 +112,11 @@ def rebuild_index() -> Dict:
                 ' '.join(p.get('types') or []),
             ]
             body = ' '.join([str(x) for x in body_parts if x])
-            conn.execute("INSERT INTO search_index (entity_type, entity_id, title, body) VALUES ('partner', ?, ?, ?)",
-                         (pid, title, body))
+            conn.execute(
+                f"INSERT INTO search_index (entity_type, entity_id, title, body, tsv) "
+                f"VALUES ('partner', ?, ?, ?, {tsv_expr})",
+                (pid, title, body)
+            )
             counts['partner'] += 1
 
         for pr in (data.get('products') or []):
@@ -107,8 +130,11 @@ def rebuild_index() -> Dict:
                 pr.get('detailedSpec', ''),
             ]
             body = ' '.join([str(x) for x in body_parts if x])
-            conn.execute("INSERT INTO search_index (entity_type, entity_id, title, body) VALUES ('product', ?, ?, ?)",
-                         (prid, title, body))
+            conn.execute(
+                f"INSERT INTO search_index (entity_type, entity_id, title, body, tsv) "
+                f"VALUES ('product', ?, ?, ?, {tsv_expr})",
+                (prid, title, body)
+            )
             counts['product'] += 1
 
         for d in (data.get('deals') or []):
@@ -118,8 +144,11 @@ def rebuild_index() -> Dict:
             body_parts = [d.get('supplierName', ''), d.get('buyerName', ''),
                           d.get('status', ''), d.get('remarks', '')]
             body = ' '.join([str(x) for x in body_parts if x])
-            conn.execute("INSERT INTO search_index (entity_type, entity_id, title, body) VALUES ('deal', ?, ?, ?)",
-                         (did, title, body))
+            conn.execute(
+                f"INSERT INTO search_index (entity_type, entity_id, title, body, tsv) "
+                f"VALUES ('deal', ?, ?, ?, {tsv_expr})",
+                (did, title, body)
+            )
             counts['deal'] += 1
 
         for o in (data.get('offers') or []):
@@ -128,18 +157,26 @@ def rebuild_index() -> Dict:
             title = f"{o.get('offerNo', '')} — {o.get('productName', '')}"
             body_parts = [o.get('buyerName', ''), o.get('status', ''), o.get('notes', '')]
             body = ' '.join([str(x) for x in body_parts if x])
-            conn.execute("INSERT INTO search_index (entity_type, entity_id, title, body) VALUES ('offer', ?, ?, ?)",
-                         (oid, title, body))
+            conn.execute(
+                f"INSERT INTO search_index (entity_type, entity_id, title, body, tsv) "
+                f"VALUES ('offer', ?, ?, ?, {tsv_expr})",
+                (oid, title, body)
+            )
             counts['offer'] += 1
 
         # Documents: iz document_register tabele ako postoji
         try:
-            docs = conn.execute("SELECT id, doc_type, doc_no, partner_name, hash_value FROM document_register").fetchall()
+            docs = conn.execute(
+                "SELECT id, doc_type, doc_no, partner_name, hash_value FROM document_register"
+            ).fetchall()
             for did, dtype, dno, pname, dh in docs:
                 title = f"{dtype} {dno}"
                 body = f"{pname or ''} {dh or ''}"
-                conn.execute("INSERT INTO search_index (entity_type, entity_id, title, body) VALUES ('document', ?, ?, ?)",
-                             (str(did), title, body))
+                conn.execute(
+                    f"INSERT INTO search_index (entity_type, entity_id, title, body, tsv) "
+                    f"VALUES ('document', ?, ?, ?, {tsv_expr})",
+                    (str(did), title, body)
+                )
                 counts['document'] += 1
         except db.OperationalError:
             pass  # document_register tabela ne postoji u toj instanci
@@ -151,48 +188,56 @@ def rebuild_index() -> Dict:
 
 
 def search(query: str, limit: int = 20, entity_types: List[str] = None) -> List[Dict]:
-    """Pretraži svih entiteta. FTS5 sintaksa je podržana:
-        "aspidus"       — match token
-        "aspi*"         — prefix
+    """Pretraži sve entitete. Podržava:
+        "aspidus"       — match token (sa prefix match)
+        "aspi"          — prefix match (aspi:* → aspidus, aspire, ...)
         "term1 term2"   — implicit AND
-        "term1 OR term2" — eksplicit OR
     Vraća listu {entity_type, entity_id, title, snippet, rank}."""
     _ensure_schema()
     query = (query or '').strip()
     if not query:
         return []
 
-    # FTS5 traži da sanitize-ujemo — dodajemo "*" na kraj da omogući prefix match
-    # ako korisnik nije uneo eksplicitne operatore.
-    safe = query.replace('"', ' ').replace("'", ' ').strip()
-    if not any(op in safe for op in ('*', ' AND ', ' OR ', ' NOT ')):
-        # split u tokene i dodaj prefix wildcard na svaki (osim ako je već tu)
-        tokens = [t for t in safe.split() if t]
-        safe = ' '.join(t if t.endswith('*') else (t + '*') for t in tokens)
-    if not safe:
+    # Sanitizuj — ukloni specijalne karaktere koji bi slomili to_tsquery
+    safe = query.replace('"', ' ').replace("'", ' ').replace('\\', ' ').strip()
+    tokens = [t for t in safe.split() if t]
+    if not tokens:
         return []
+
+    # Pravi to_tsquery string: "token1:* & token2:*" (prefix match na svakom tokenu)
+    tsquery_str = ' & '.join(t + ':*' for t in tokens)
 
     sql = """
         SELECT entity_type, entity_id, title,
-               snippet(search_index, 3, '[', ']', '…', 12) AS snip,
-               rank
+               ts_headline('simple', body, to_tsquery('simple', ?),
+                           'StartSel=[ StopSel=] MaxWords=12 MinWords=1 ShortWord=1') AS snip,
+               ts_rank(tsv, to_tsquery('simple', ?)) AS rank
         FROM search_index
-        WHERE search_index MATCH ?
+        WHERE tsv @@ to_tsquery('simple', ?)
     """
-    params = [safe]
+    params = [tsquery_str, tsquery_str, tsquery_str]
     if entity_types:
         placeholders = ','.join(['?'] * len(entity_types))
         sql += f' AND entity_type IN ({placeholders})'
         params.extend(entity_types)
-    sql += ' ORDER BY rank LIMIT ?'
+    sql += ' ORDER BY rank DESC LIMIT ?'
     params.append(int(limit))
 
     try:
         with _get_conn() as conn:
             rows = conn.execute(sql, params).fetchall()
     except db.OperationalError as e:
-        logger.warning(f'search FTS5 error: {e}')
-        return []
+        logger.warning(f'search tsvector error: {e}')
+        # Fallback: pokušaj sa plainto_tsquery (bez prefix match-a)
+        try:
+            fallback_query = ' & '.join(tokens)
+            fallback_sql = sql.replace('to_tsquery', 'plainto_tsquery')
+            fallback_params = [fallback_query, fallback_query, fallback_query] + params[3:]
+            with _get_conn() as conn:
+                rows = conn.execute(fallback_sql, fallback_params).fetchall()
+        except Exception as e2:
+            logger.warning(f'search fallback error: {e2}')
+            return []
 
     return [
         {'entity_type': r[0], 'entity_id': r[1], 'title': r[2], 'snippet': r[3], 'rank': r[4]}
@@ -209,6 +254,6 @@ def index_stats() -> Dict:
                 "SELECT entity_type, COUNT(*) FROM search_index GROUP BY entity_type"
             ).fetchall()
             total = conn.execute("SELECT COUNT(*) FROM search_index").fetchone()[0]
-        return {'by_type': dict(rows), 'total': total}
+        return {'by_type': {r[0]: r[1] for r in rows}, 'total': total}
     except Exception as e:
         return {'error': str(e), 'total': 0}
