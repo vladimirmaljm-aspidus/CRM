@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 # psycopg3 je hard dependency za PostgreSQL. Ako nije instalovan, aplikacija
 # ne može da radi — jasan ImportError sa porukom za instalaciju.
 import psycopg
-from psycopg import pool as _pgpool
+import psycopg_pool as _pgpool
 
 
 # ==========================================================
