@@ -17,11 +17,14 @@ Ovaj modul ZADRŽAVA taj identičan API, samo što ispod radi nad PostgreSQL baz
      PORTAL_DB_FILE, ali ih ovaj modul tretira kao labele (log tag), ne kao fajlove.
   3. Automatska konverzija `?` → `%s` u svakom execute() pozivu — nijedna rute ne
      mora da menja svoje SQL upite (SQLite stil `WHERE id=?` nastavlja da radi).
-  4. Row objekat koji podržava i `row[0]` (tuple-style, kao SQLite) i `row['col']`
+  4. Automatska konverzija `INSERT OR REPLACE INTO` → `INSERT ... ON CONFLICT DO UPDATE`
+     (SQLite upsert sintaksa ne postoji u PostgreSQL-u; ovo je centralizovano rešenje
+     tako da nijedan route fajl ne mora da se menja).
+  5. Row objekat koji podržava i `row[0]` (tuple-style, kao SQLite) i `row['col']`
      (dict-style, kao sqlite3.Row). `row_factory = sqlite3.Row` postaje no-op.
-  5. Exception aliasi: db.IntegrityError, db.OperationalError, db.DatabaseError,
+  6. Exception aliasi: db.IntegrityError, db.OperationalError, db.DatabaseError,
      db.Error — tako da hvatanje `sqlite3.IntegrityError` samo zamenimo importom.
-  6. retry_on_lock / retry_call — zadržani radi kompatibilnosti; u Postgresu nema
+  7. retry_on_lock / retry_call — zadržani radi kompatibilnosti; u Postgresu nema
      "database is locked", ali retry na OperationalError (npr. mrežni blip) ostaje.
 """
 import os
@@ -41,14 +44,10 @@ from psycopg.rows import dict_row
 # ==========================================================
 #  EXCEPTION ALIASI (kompatibilnost sa sqlite3.* u route fajlovima)
 # ==========================================================
-# Stari kod hvata: sqlite3.IntegrityError, sqlite3.OperationalError,
-# sqlite3.DatabaseError, sqlite3.Error. Izlažemo iste atribute ovde, tako da
-# route fajlovi mogu da pišu `import db` pa hvataju `db.IntegrityError`.
 Error = psycopg.Error
 DatabaseError = psycopg.DatabaseError
 OperationalError = psycopg.OperationalError
 IntegrityError = psycopg.errors.UniqueViolation  # PRIMARY KEY / UNIQUE violation
-# psycopg.ProgrammingError → "no such table"/"column does not exist" ekvivalent
 ProgrammingError = psycopg.ProgrammingError
 NotSupportedError = psycopg.NotSupportedError
 DataError = psycopg.DataError
@@ -58,36 +57,21 @@ InternalError = psycopg.InternalError
 # ==========================================================
 #  CONNECTION POOL (Supabase / Postgres)
 # ==========================================================
-# Lazy-inicijalizovan, thread-safe singleton pool. Pravi se pri prvom
-# connect_raw() pozivu. Render pokreće više gunicorn workera (procesa), i svaki
-# ima svoj pool — to je normalno i bezbedno za Supabase (pooler radi ispred).
 _pool = None
 _pool_lock = threading.Lock()
 _DSN = os.getenv("DATABASE_URL", "").strip()
 
 
 class _PgRow(dict):
-    """Rezultat fetchone()/fetchall(). Ponaša se kao tuple I kao dict I kao sqlite3.Row.
-
-    - row[0], row[1]  → pristup po poziciji kolone (kao stari SQLite tuple redovi)
-    - row['username'] → pristup po imenu (kao sqlite3.Row)
-    - list(row) / len(row) / iter(row) → radi kao tuple
-    - row.get('x', default) → dict-style fallback
-
-    Napomena: psycopg RealDictCursor vraća dictove; mi ih umotamo u _PgRow da bi
-    indeks-po-poziciji i dalje radio kao u originalnom SQLite kodu.
-    """
+    """Rezultat fetchone()/fetchall(). Ponaša se kao tuple I kao dict I kao sqlite3.Row."""
     __slots__ = ()
 
     def __getitem__(self, key):
         if isinstance(key, int):
-            # mapiranje pozicije → vrednost po redu ubacivanja (kao tuple)
             return list(dict.values(self))[key]
         return dict.__getitem__(self, key)
 
     def __iter__(self):
-        # iteracija vraća VREDNOSTI (kao tuple), ne ključeve — kompatibilno sa
-        # kodom koji radi `for v in row:` ili `a, b = row`.
         return iter(dict.values(self))
 
     def __len__(self):
@@ -102,18 +86,20 @@ class _PgRow(dict):
         return not self.__eq__(other)
 
     def __hash__(self):
-        return None  # mutable; nije hashable (kao ni tuple nije menjaiv)
+        return None
 
     def __repr__(self):
         return "_PgRow(" + repr(tuple(dict.values(self))) + ")"
 
 
-# Regex za konverziju `?` u `%s`. Čuva `?` unutar jednostrukih/dvostrukih navodnika
-# (string literala u SQL-u) i unutar `$$ ... $$` blokova (Postgres dollar-quoting).
+# ==========================================================
+#  SQL KONVERZIJE (SQLite → PostgreSQL)
+# ==========================================================
+
 _QMARK_RE = re.compile(r"""
-    ('(?:[^']|'')*')     |   # single-quoted string literal (sa '' escape-om)
-    ("(?:[^"]|"")*")      |  # double-quoted identifier (Postgres quote ident)
-    (\?)                     # lone ? placeholder
+    ('(?:[^']|'')*')     |
+    ("(?:[^"]|"")*")      |
+    (\?)
 """, re.VERBOSE)
 
 
@@ -124,34 +110,59 @@ def _convert_placeholders(sql):
 
     def _repl(m):
         if m.group(1) is not None or m.group(2) is not None:
-            return m.group(0)           # string/identifier literal — ostaje kako jeste
-        return '%s'                     # lone ? → %s
+            return m.group(0)
+        return '%s'
     return _QMARK_RE.sub(_repl, sql)
 
 
-class _PgCursor:
-    """Wrapper oko psycopg cursor-a koji automatski konvertuje `?`→`%s` i vraća _PgRow.
+_INSERT_OR_REPLACE_RE = re.compile(
+    r"INSERT\s+OR\s+REPLACE\s+INTO\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(([^)]+)\)\s*VALUES\s*\(([^)]+)\)",
+    re.IGNORECASE | re.DOTALL,
+)
 
-    Podržava i "context manager" i običan poziv. Imitira sqlite3.Cursor dovoljno
-    da sav postojeći kod (c.execute(...), c.fetchone(), c.fetchall(), c.rowcount)
-    nastavi da radi bez izmena.
-    """
+
+def _convert_insert_or_replace(sql):
+    """Pretvara SQLite INSERT OR REPLACE u PostgreSQL ON CONFLICT upsert."""
+    if 'INSERT OR REPLACE' not in sql.upper():
+        return sql
+
+    def _repl(m):
+        table = m.group(1)
+        cols_str = m.group(2)
+        vals_str = m.group(3)
+        cols = [c.strip() for c in cols_str.split(',') if c.strip()]
+        if len(cols) < 2:
+            return f"INSERT INTO {table} ({cols_str}) VALUES ({vals_str})"
+        pk = cols[0]
+        update_cols = cols[1:]
+        set_clause = ", ".join(f"{c} = EXCLUDED.{c}" for c in update_cols)
+        return (f"INSERT INTO {table} ({cols_str}) VALUES ({vals_str}) "
+                f"ON CONFLICT ({pk}) DO UPDATE SET {set_clause}")
+
+    return _INSERT_OR_REPLACE_RE.sub(_repl, sql)
+
+
+def _convert_sql(sql):
+    """Sve SQL konverzije u jednom prolazu: INSERT OR REPLACE → ? → %s."""
+    sql = _convert_insert_or_replace(sql)
+    sql = _convert_placeholders(sql)
+    return sql
+
+
+class _PgCursor:
+    """Wrapper oko psycopg cursor-a koji automatski konvertuje SQLite→Postgres SQL."""
     def __init__(self, real_cursor):
         self._c = real_cursor
-        # KLJUČNO: psycopg po defaultu vraća tuple redove, ali _PgRow nasleđuje dict
-        # i očekuje dict. Bez ove linije fetchone() pada sa:
-        #   "ValueError: dictionary update sequence element #0 has length N; 2 is required"
-        # dict_row čini da fetchone()/fetchall() vraćaju dict, što _PgRow prihvata.
         try:
             self._c.row_factory = dict_row
         except Exception:
             pass
 
     def execute(self, sql, params=()):
-        return self._c.execute(_convert_placeholders(sql), params)
+        return self._c.execute(_convert_sql(sql), params)
 
     def executemany(self, sql, seq_of_params):
-        return self._c.executemany(_convert_placeholders(sql), seq_of_params)
+        return self._c.executemany(_convert_sql(sql), seq_of_params)
 
     def fetchone(self):
         row = self._c.fetchone()
@@ -173,8 +184,6 @@ class _PgCursor:
 
     @property
     def lastrowid(self):
-        # Postgres ne koristi lastrowid (kod koristi UUID-ove generisane u Pythonu),
-        # ali vraćamo None radi kompatibilnosti sa sqlite3 API-jem.
         return None
 
     def close(self):
@@ -198,41 +207,27 @@ class _PgCursor:
 
 
 class PooledConnection:
-    """Veza izvučena iz pool-a koja imitira sqlite3.Connection.
-
-    Podržava:
-      - context manager (`with db.connect_raw(DB_FILE) as conn:`) → auto-return u pool
-      - conn.cursor() → _PgCursor (sa `?`→`%s` konverzijom)
-      - conn.execute(sql, params) → shortcut koji vraća cursor (kao sqlite3.Connection)
-      - conn.commit() / conn.rollback()
-      - conn.close() → vraća vezu u pool (SIGURNO, može se zvati više puta)
-      - `conn.row_factory = X` → no-op (komp. sa `conn.row_factory = sqlite3.Row`)
-    """
+    """Veza izvučena iz pool-a koja imitira sqlite3.Connection."""
     def __init__(self, pgconn, label="(default)"):
         self._pgconn = pgconn
         self._returned = False
         self._label = label
-        # sqlite3 kompat: neki kod postavlja autocommit preko izolacionog nivoa.
-        # psycopg po defaultu radi u autocommit=False (transakcije), što odgovara
-        # starom SQLite DEFERRED ponašanju (commit() na kraju upisa).
         try:
             pgconn.autocommit = False
         except Exception:
             pass
 
-    # ---- sqlite3.Connection API ----
     def cursor(self):
         cur = self._pgconn.cursor()
         return _PgCursor(cur)
 
     def execute(self, sql, params=()):
-        # sqlite3.Connection.execute() vraća cursor direktno
         cur = self.cursor()
         cur.execute(sql, params)
         return cur
 
     def executemany(self, sql, seq_of_params):
-        return self._pgconn.executemany(_convert_placeholders(sql), seq_of_params)
+        return self._pgconn.executemany(_convert_sql(sql), seq_of_params)
 
     def commit(self):
         try:
@@ -247,7 +242,6 @@ class PooledConnection:
             pass
 
     def close(self):
-        """Vraća vezu u pool. Bezbedno pozvati više puta i iz context-managera."""
         if self._returned:
             return
         self._returned = True
@@ -256,15 +250,12 @@ class PooledConnection:
         except Exception as e:
             logger.warning(f"db.close/return-to-pool failed ({self._label}): {e}")
 
-    # ---- kompatibilnost sa sqlite3 specifičnostima ----
     @property
     def row_factory(self):
         return None
 
     @row_factory.setter
     def row_factory(self, _value):
-        # `conn.row_factory = sqlite3.Row` → no-op (uvek vraćamo _PgRow koji
-        # podržava i indeks-po-poziciji i indeks-po-imenu).
         pass
 
     @property
@@ -279,7 +270,6 @@ class PooledConnection:
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        # Ako je bila greška, rollback; u svakom slučaju vrati vezu u pool.
         if exc_type is not None:
             self.rollback()
         self.close()
@@ -287,22 +277,15 @@ class PooledConnection:
 
 
 def _get_dsn():
-    """Vraća DSN za psycopg. Ako env DATABASE_URL nije postavljen, baci grešku.
-
-    Dodaje sslmode=require ako već nije u DSN-u — Supabase transaction pooler
-    (port 6543) zahteva SSL i bez njega konekcije padaju sa
-    'SSL error: unexpected eof while reading'.
-    """
+    """Vraća DSN za psycopg. Ako env DATABASE_URL nije postavljen, baci grešku."""
     global _DSN
     dsn = (_DSN or os.getenv("DATABASE_URL") or "").strip()
     if not dsn:
         raise RuntimeError(
             "DATABASE_URL environment variable is not set. "
             "AspidusCRM koristi isključivo PostgreSQL (Supabase) — bez DATABASE_URL "
-            "aplikacija ne može da se poveže na bazu. Postavite DATABASE_URL env var "
-            "(Supabase Dashboard → Settings → Database → Connection string, URI mode)."
+            "aplikacija ne može da se poveže na bazu."
         )
-    # Dodaj sslmode=require ako već nije prisutan (Supabase zahteva SSL).
     if "sslmode" not in dsn:
         sep = "&" if "?" in dsn else "?"
         dsn = dsn + sep + "sslmode=require"
@@ -312,29 +295,30 @@ def _get_dsn():
 def _configure_conn(conn):
     """Poziva se pri svakoj novoj konekciji iz pool-a.
 
-    Postavlja statement_timeout da spreči da jedan zaglavljen upit drži konekciju
-    zauvek, i autocommit=False (transakcije) što odgovara starom SQLite ponašanju.
+    KRITIČNO: MORA se koristiti autocommit=True tokom SET komande!
+    U psycopg3, kada je autocommit=False, svaki execute() implicitno otvara
+    transakciju. Ako ostavimo autocommit=False, SET komanda otvori transakciju,
+    cursor se zatvori, ali transakcija ostane otvorena (status = INTRANS).
+    psycopg_pool onda odbaci konekciju kao "lošu" i pokuša ponovo. Posle 30s
+    pukne sa PoolTimeout: 'couldn't get a connection after 30.00 sec'.
+
+    Rešenje: autocommit=True tokom SET → NE otvara transakciju → IDLE ostaje.
     """
     try:
-        conn.autocommit = False
-    except Exception:
-        pass
-    try:
-        # 60s timeout po statementu — sprečava da zaglavljen upit drži konekciju.
+        conn.autocommit = True
         with conn.cursor() as cur:
             cur.execute("SET statement_timeout = 60000")
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"_configure_conn: SET statement_timeout failed: {e}")
+    finally:
+        try:
+            conn.autocommit = False
+        except Exception:
+            pass
 
 
 def _ensure_pool():
-    """Lazy-kreira connection pool (thread-safe).
-
-    Koristi configure callback koji postavlja statement_timeout i autocommit.
-    max_idle=120 i max_lifetime=300 osiguravaju da se "stare" konekcije recikliraju
-    pre nego što ih Supabase pooler (PgBouncer) ugasi — to rešava
-    'SSL error: unexpected eof' i 'discarding closed connection [BAD]' greške.
-    """
+    """Lazy-kreira connection pool (thread-safe)."""
     global _pool
     if _pool is not None:
         return _pool
@@ -347,9 +331,9 @@ def _ensure_pool():
                 dsn,
                 min_size=1,
                 max_size=8,
-                max_idle=120,       # recikliraj idle konekcije posle 2 min
-                max_lifetime=300,   # recikliraj sve konekcije posle 5 min
-                timeout=30,         # čekaj max 30s na getconn
+                max_idle=120,
+                max_lifetime=300,
+                timeout=30,
                 configure=_configure_conn,
             )
             logger.info("DB POOL: uspešno konektovan na Supabase PostgreSQL (SSL=require).")
@@ -379,24 +363,7 @@ def _return_to_pool(pgconn):
 # ==========================================================
 
 def connect_raw(db_path=None, timeout=60.0, label=None):
-    """Drop-in zamena za sqlite3.connect() / stari db.connect_raw().
-
-    Vraća PooledConnection koja se može koristiti i kao context manager i kao
-    obična konekcija. `db_path` se prima radi kompatibilnosti (stari kod šalje
-    DB_FILE/AUDIT_DB_FILE/PORTAL_DB_FILE) ali se koristi samo kao log labela —
-    SVI podaci idu na istu Supabase PostgreSQL bazu.
-
-    Primer (context manager — najčešći obrazac u kodu):
-        with db.connect_raw(DB_FILE) as conn:
-            row = conn.execute('SELECT * FROM users WHERE id=?', (uid,)).fetchone()
-
-    Primer (obična konekcija — npr. routes/audit.py):
-        conn = db.connect_raw(DB_FILE)
-        try:
-            ...
-        finally:
-            conn.close()
-    """
+    """Drop-in zamena za sqlite3.connect() / stari db.connect_raw()."""
     _lbl = label or db_path or "(default)"
     return _get_conn_from_pool(_lbl)
 
@@ -407,21 +374,12 @@ def _noop(*a, **k):
 
 
 def connect(db_path=None, *, write=False, timeout=60.0):
-    """Context-manager wrapper — kompatibilan sa starim db.connect().
-
-    Vraća PooledConnection koja se ponaša kao context manager. `write=True` je
-    prihvaćen (stari SQLite kod ga koristi za process-level lock) ali ovde je
-    no-op — PostgreSQL ima sopstvenu MVCC konkurenciju, ne postoji "locked".
-    """
+    """Context-manager wrapper — kompatibilan sa starim db.connect()."""
     return connect_raw(db_path, timeout=timeout)
 
 
 def retry_on_lock(max_attempts=6, base_delay=0.1):
-    """Dekorator (kompat. sa starim API-jem) — retry na prolazne DB greške.
-
-    PostgreSQL nema "database is locked", ali mrežni blip-ovi / pool timeout /
-    privremeni conn reset mogu da jave OperationalError. Retry-ujemo te.
-    """
+    """Dekorator (kompat. sa starim API-jem) — retry na prolazne DB greške."""
     import time as _time
     from functools import wraps
 
@@ -463,9 +421,6 @@ def retry_call(fn, *args, max_attempts=6, base_delay=0.1, **kwargs):
             _time.sleep(wait)
 
 
-# ==========================================================
-#  HEALTH CHECK (koristi ga /api/system/health)
-# ==========================================================
 def health_check(db_path=None):
     """Vraća dictionary sa health metrikama za PostgreSQL/Supabase."""
     out = {'backend': 'postgresql', 'ok': False}
