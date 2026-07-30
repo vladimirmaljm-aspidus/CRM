@@ -517,7 +517,7 @@ def _housekeeping_loop():
                 try:
                     with db.connect_raw(AUDIT_DB_FILE) as conn:
                         c = conn.cursor()
-                        c.execute('DELETE FROM audit_logs WHERE timestamp < ? AND is_suspicious = 0', (cutoff,))
+                        c.execute('DELETE FROM audit_logs WHERE timestamp < ? AND is_suspicious = FALSE', (cutoff,))
                         deleted = c.rowcount
                         conn.commit()
                     if deleted:
