@@ -136,7 +136,7 @@ class _PgCursor:
     da sav postojeći kod (c.execute(...), c.fetchone(), c.fetchall(), c.rowcount)
     nastavi da radi bez izmena.
     """
-        def __init__(self, real_cursor):
+    def __init__(self, real_cursor):
         self._c = real_cursor
         # KLJUČNO: psycopg po defaultu vraća tuple redove, ali _PgRow nasleđuje dict
         # i očekuje dict. Bez ove linije fetchone() pada sa:
