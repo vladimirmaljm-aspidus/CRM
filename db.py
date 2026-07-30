@@ -150,7 +150,18 @@ def _convert_sql(sql):
 
 
 class _PgCursor:
-    """Wrapper oko psycopg cursor-a koji automatski konvertuje SQLite→Postgres SQL."""
+    """Wrapper oko psycopg cursor-a koji automatski konvertuje SQLite→Postgres SQL
+    i vraća _PgRow.
+
+    KRITIČNO: execute() MORA vraćati self (ne raw psycopg cursor), jer ogroman
+    deo koda radi "chaining":
+        row = cursor.execute('SELECT ...').fetchone()[0]
+        rows = [r[0] for r in cursor.execute('SELECT ...').fetchall()]
+    Ako execute() vrati raw psycopg cursor (kao što je bilo pre), fetchone()
+    vraća običan dict (zbog dict_row), a dict[0] baca KeyError(0). Vraćanjem
+    self, fetchone()/fetchall() idu kroz naš wrapper i vraćaju _PgRow koji
+    podržava i row[0] (tuple-style) i row['col'] (dict-style).
+    """
     def __init__(self, real_cursor):
         self._c = real_cursor
         try:
@@ -159,10 +170,17 @@ class _PgCursor:
             pass
 
     def execute(self, sql, params=()):
-        return self._c.execute(_convert_sql(sql), params)
+        # MORA vratiti self, NE self._c.execute(...)!
+        # sqlite3.Cursor.execute() vraća self (cursor) da bi chaining radio.
+        # Ako vratimo raw psycopg cursor, .fetchone() vraća dict, a dict[0] →
+        # KeyError(0) što se loguje kao "Greška pri inicijalizaciji glavne baze - 0".
+        self._c.execute(_convert_sql(sql), params)
+        return self
 
     def executemany(self, sql, seq_of_params):
-        return self._c.executemany(_convert_sql(sql), seq_of_params)
+        # Isto kao execute() — vraćamo self radi chaining kompatibilnosti.
+        self._c.executemany(_convert_sql(sql), seq_of_params)
+        return self
 
     def fetchone(self):
         row = self._c.fetchone()
