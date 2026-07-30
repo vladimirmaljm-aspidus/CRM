@@ -2,7 +2,7 @@ import os
 import uuid
 import db
 import logging
-from config import DB_FILE
+from config import DB_FILE, PORTAL_DB_FILE, AUDIT_DB_FILE
 
 # Postavljanje logera za bazu
 logger = logging.getLogger(__name__)
@@ -349,7 +349,7 @@ def init_db():
                 docType TEXT NOT NULL,
                 year INTEGER NOT NULL,
                 seq INTEGER NOT NULL,
-                docNumber TEXT NOT NULL,
+                doc_number TEXT NOT NULL,
                 entityId TEXT,
                 revision INTEGER DEFAULT 0,
                 status TEXT DEFAULT 'active',
@@ -357,7 +357,7 @@ def init_db():
                 issuedBy TEXT,
                 PRIMARY KEY (docType, year, seq, revision)
             )''')
-            c.execute('CREATE UNIQUE INDEX IF NOT EXISTS idx_docreg_number ON document_register(docNumber)')
+            c.execute('CREATE UNIQUE INDEX IF NOT EXISTS idx_docreg_number ON document_register(doc_number)')
             c.execute('CREATE INDEX IF NOT EXISTS idx_docreg_entity ON document_register(entityId)')
 
             # DOCUMENT REVISIONS — svaka izmena izdatog dokumenta se snima kao
@@ -365,7 +365,7 @@ def init_db():
             # dokumenta u istoriji može rekonstruisati SVAKA verzija.
             c.execute('''CREATE TABLE IF NOT EXISTS document_revisions (
                 id TEXT PRIMARY KEY,
-                docNumber TEXT NOT NULL,
+                doc_number TEXT NOT NULL,
                 revision INTEGER NOT NULL,
                 entityId TEXT,
                 snapshot TEXT NOT NULL,
@@ -375,8 +375,8 @@ def init_db():
                 changedBy TEXT,
                 changedAt TEXT NOT NULL
             )''')
-            c.execute('CREATE INDEX IF NOT EXISTS idx_docrev_number ON document_revisions(docNumber)')
-
+            c.execute('CREATE INDEX IF NOT EXISTS idx_docrev_number ON document_revisions(doc_number)')
+            
             # OFFER VERSIONS — svaki put kada se ponuda menja (cena, količina,
             # incoterm, stavke…) prethodna verzija se snima ovde. Ovo daje admin-u
             # potpunu istoriju "šta je bilo, šta je klijent video pre pregovora,
