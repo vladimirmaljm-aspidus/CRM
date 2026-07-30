@@ -53,40 +53,20 @@ if SECRET_KEY_IS_GENERATED:
 app.secret_key = SECRET_KEY
 app.config['MAX_CONTENT_LENGTH'] = MAX_CONTENT_LENGTH
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-# ISPRAVKA: ranije nije bio postavljen, pa je /portal_uploads/<filename> (u
-# routes/portal/actions.py) uvek bacao KeyError -> 500 pri preuzimanju KYC/portal fajlova.
 app.config['PORTAL_UPLOAD_FOLDER'] = PORTAL_UPLOAD_FOLDER
 
 # BRUTALNA ZAŠTITA SESIJE - VOJNI STANDARD
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=2)
 app.config['SESSION_COOKIE_HTTPONLY'] = True
-# SameSite=Lax (ne 'Strict') — 'Strict' odbacuje sesijski cookie pri nekim
-# window.location.reload() / cross-sub-navigacijama na Renderu i izbacivalo je
-# korisnika odmah nakon uspešnog login-a. 'Lax' i dalje štiti od CSRF-a.
 app.config['SESSION_COOKIE_SAMESITE'] = os.getenv('SESSION_COOKIE_SAMESITE', 'Lax')
-
-# Sesijski kolačić sa Secure flagom se NE ŠALJE preko nešifrovanog HTTP-a (npr.
-# http://localhost), pa bi uključivanje ovoga u lokalnom razvoju "odjavljivalo"
-# korisnika odmah nakon prijave. Zato je podrazumevano isključeno (za localhost),
-# a u PRODUKCIJI (pravi domen sa HTTPS-om) OBAVEZNO postaviti env SESSION_COOKIE_SECURE=true.
 app.config['SESSION_COOKIE_SECURE'] = os.getenv('SESSION_COOKIE_SECURE', 'false').lower() in ('true', '1', 'yes')
 if not app.config['SESSION_COOKIE_SECURE']:
     logger.warning("NAPOMENA: SESSION_COOKIE_SECURE je isključen (dev/localhost). U produkciji sa HTTPS-om postaviti env SESSION_COOKIE_SECURE=true.")
 
-# Inicijalizacija/migracija baze pri učitavanju aplikacije.
-# VAŽNO: ranije se init_db() zvao samo u __main__ bloku, pa se pod
-# `flask run` i gunicorn-om (produkcija) nije izvršavao — nove migracije
-# (npr. kolona 'signature') se ne bi primenile. Sada se izvršava uvek.
 init_db()
-
-# V22.04.05: SQLite WAL bootstrap uklonjen - DB fajlovi se rekreiraju cisti pri prvom startu
-
-# Učitaj firewall/session postavke (admin ih menja preko Settings modula) i
-# pokreni pozadinsko održavanje (rotacija audit log-a, čišćenje kešova).
 load_firewall_settings()
 start_housekeeping()
 
-# Registracija modula (Blueprints)
 app.register_blueprint(auth_bp)
 app.register_blueprint(users_bp)
 app.register_blueprint(files_bp)
@@ -112,19 +92,27 @@ app.register_blueprint(saved_filters_bp)
 app.register_blueprint(activity_feed_bp)
 app.register_blueprint(v23_admin_bp)
 app.register_blueprint(v23_extras_bp)
-# /verify/<VER-hash> — javni endpoint koji vodi na potvrdu dokumenta iz QR koda
-# na ponudi/fakturi. Bez registracije ovog bp-a, QR na PDF-u vodi u 404.
 app.register_blueprint(verify_bp)
 
-# Supabase admin API — status, migration control, feature flag switching.
-# Sve rute su admin-only i loguju se u audit_log.
 from routes.supabase_admin import supabase_admin_bp, record_error  # noqa: E402
 app.register_blueprint(supabase_admin_bp)
 
 
-# NOTE: postojao je duplirani @app.errorhandler(500) handler ispod ove tacke
-# (internal_server_error) koji je _overridovao_ ovaj i klijentu nije vracao
-# request_id. Merged u jedan handler dole (linija ~213).
+# =====================================================================
+# ISPRAVKA: CSP nonce se sada generiše U BEFORE_REQUEST (ne u after_request).
+# Ranije je nonce generisan tek u after_request — dakle NAKON renderovanja
+# šablona — pa je {{ g.csp_nonce }} u index.html bio PRAZAN, dok je u CSP
+# header bio DRUGI (pravi) nonce. Browser je zbog mismatch-a blokirao inline
+# <script> u kom je login handler → forma nikada nije slala POST
+# /api/auth/login, već je radila native GET submit i korisnik ostajao na
+# login ekranu. Sada je nonce isti i u HTML-u i u headeru.
+# =====================================================================
+@app.before_request
+def generate_csp_nonce():
+    import secrets as _secrets_nonce
+    from flask import g as _g_nonce
+    _g_nonce.csp_nonce = _secrets_nonce.token_urlsafe(16)
+
 
 @app.before_request
 def enforce_csrf():
@@ -155,32 +143,21 @@ def check_crm_session_timeout():
 
 @app.before_request
 def limit_login_attempts():
-    """
-    Optimizovan i osiguran sistem za blokiranje Brute Force napada.
-    """
     if request.endpoint == 'auth.login' and request.method == 'POST':
         ip = request.remote_addr
-        
         if ip in FirewallCache.whitelist:
             return
-        
         now = time.time()
-        
-        # Očisti stare pokušaje
         attempts = FirewallCache.login_attempts.get(ip, [])
         valid_attempts = [t for t in attempts if now - t < 300]
-        
-        # Provera pre nego što dodamo novi pokušaj (sprečava produžavanje kazne u beskraj)
         if len(valid_attempts) >= FirewallCache.settings.get('max_login', 10):
             logger.warning(f"Brute force attempt blocked from IP: {ip}")
             log_audit('SECURITY_BLOCK', 'firewall', f'IP {ip} blocked due to excessive login attempts.', is_suspicious=True)
             abort(429, description="Too many login attempts. Your IP address is blocked for 5 minutes for security reasons.")
-        
-        # Ako nije blokiran, upiši trenutni pokušaj
         valid_attempts.append(now)
         FirewallCache.login_attempts[ip] = valid_attempts
 
-# === GLOBALNI HVATAČI GREŠAKA (ZABRANJUJU CURENJE INFORMACIJA) ===
+# === GLOBALNI HVATAČI GREŠAKA ===
 
 @app.errorhandler(413)
 def request_entity_too_large(error):
@@ -196,18 +173,12 @@ def ratelimit_handler(e):
 def not_found_error(error):
     if request.path.startswith('/api/'):
         return jsonify({"error": "Requested resource not found."}), 404
-    # Dodat pravilan HTTP status kod
     return render_template('index.html'), 404
 
 @app.errorhandler(500)
 def internal_server_error(error):
-    """
-    Napadaču ne curimo Python traceback — klijentu vraćamo generičku poruku
-    + kratak request_id da može admin da nađe traceback u /admin/errors.
-    """
     import uuid
     req_id = uuid.uuid4().hex[:12]
-
     logger.error(f"Internal Server Error [{req_id}]: {request.path} - {str(error)}", exc_info=True)
     log_audit('CRITICAL_ERROR', 'system', f"Endpoint {request.path} failed (req={req_id}).", is_suspicious=True)
     try:
@@ -224,7 +195,6 @@ def internal_server_error(error):
         )
     except Exception:
         pass
-
     if request.path.startswith('/api/'):
         return jsonify({
             "error": "Internal Server Error",
@@ -238,26 +208,16 @@ def internal_server_error(error):
 def method_not_allowed(error):
     if request.path.startswith('/api/'):
         return jsonify({"error": "Method not allowed for this endpoint."}), 405
-    # Dodat pravilan HTTP status kod
     return render_template('index.html'), 405
 
 @app.after_request
 def apply_brutal_security_headers(response):
-    """
-    Aplikacija bezbednosnih zaglavlja i onemogućavanje keširanja za osetljive rute.
-    """
     response.cache_control.no_store = True
     response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, post-check=0, pre-check=0, max-age=0'
     response.headers['X-Content-Type-Options'] = 'nosniff'
     response.headers['X-Frame-Options'] = 'DENY'
     response.headers['X-XSS-Protection'] = '1; mode=block'
-    
-    # HSTS - Prisiljava pretraživač da narednih godinu dana komunicira isključivo preko HTTPS-a
     response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains; preload'
-
-    # Dodatni sloj: onemogući curenje referrer-a, isključi opasne browser API-je
-    # (kamera/mikrofon/USB/serial), izoluj window od cross-origin popup-a, i
-    # blokiraj Adobe/Silverlight cross-domain policy fajlove.
     response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
     response.headers['Permissions-Policy'] = (
         'accelerometer=(), autoplay=(), camera=(), clipboard-read=(self), '
@@ -271,55 +231,23 @@ def apply_brutal_security_headers(response):
     response.headers['Cross-Origin-Resource-Policy'] = 'same-origin'
     response.headers['X-Permitted-Cross-Domain-Policies'] = 'none'
 
-    # NOINDEX za PORTAL — B2B portal ne sme da se pojavi u Google/Bing rezultatima.
-    # Zaposleni CRM je već iza login-a, ali portal linkovi kruže preko emaila i
-    # neko može slučajno da ga podeli javno. Ovaj zaglavlje eksplicitno kaže
-    # svim ozbiljnim crawler-ima da ga NE indeksiraju.
     if request.path.startswith('/portal') or request.path.startswith('/api/portal'):
         response.headers['X-Robots-Tag'] = 'noindex, nofollow, noarchive, nosnippet'
-    
-    # Sadržajna polisa (CSP) — dozvoljeni izvori za skripte/style/API
-    #
-    # BEZBEDNOSNA NAPOMENA: 'unsafe-inline' i 'unsafe-eval' su prethodno bili
-    # globalno dozvoljeni u script-src — to praktično poništava CSP zaštitu
-    # jer bilo koji XSS payload može da izvršava proizvoljan JS. Sada koristimo
-    # per-request nonce (jednokratni broj) za inline skripte — frontend mora
-    # da ubaci <script nonce="..."> atribut. 'unsafe-eval' je uklonjen jer
-    # nije potreban osim ako se ne koristi eval()/new Function() što mi ne radimo.
-    #
-    # script-src:
-    #  - 'nonce-<random>'      — inline skripte sa odgovarajućim nonce atributom
-    #  - cdn.tailwindcss.com   — Tailwind runtime (utility CSS)
-    #  - cdn.jsdelivr.net      — Chart.js (dashboard) + SheetJS (XLSX import), lazy-loaded
-    #  - cdnjs.cloudflare.com  — jsPDF fallback + Leaflet + Font Awesome
-    #  - unpkg.com             — Leaflet
-    #  - hcaptcha.com + *.hcaptcha.com — portal anti-bot widget
-    #
-    # connect-src (XHR/fetch iz browser-a):
-    #  - Sopstveni /api/*             — 'self'
-    #  - ip-api.com                   — geo lookup pri login-u
-    #  - open.er-api.com              — legacy FX (deal profit calc)
-    #  - exchangerate.host            — nove FX rate (v22 dashboard)
-    #  - nominatim.openstreetmap.org  — geocode adresa
-    #  - router.project-osrm.org      — kopneno rutiranje (logistics)
-    #  - hcaptcha.com                 — portal captcha verify
-    #  - *.basemaps.cartocdn.com      — Leaflet tile-ovi (u img-src ispod)
-    # Supabase host — čitamo iz env-a da nadaomo Auth i Storage endpoint-ima
-    # u CSP allow-listu. Ako SUPABASE_URL nije postavljen, ostavljamo prazan
-    # placeholder (nema efekta ni na koju konekciju).
+
     import os as _os_csp
-    import secrets as _secrets_csp
     _sb_url = _os_csp.environ.get('SUPABASE_URL', '').strip().rstrip('/')
     _sb_host = ''
     if _sb_url:
         _sb_host = _sb_url.replace('https://', '').replace('http://', '')
     _sb_https = f'https://{_sb_host}' if _sb_host else ''
 
-    # Generišemo per-request nonce i izlažemo ga kao g.csp_nonce radi korišćenja
-    # u šablonima preko {{ g.csp_nonce }}.
-    _csp_nonce = _secrets_csp.token_urlsafe(16)
+    # === ISPRAVKA: koristimo nonce koji je VeĆ generisan u before_request ===
     from flask import g as _g_csp
-    _g_csp.csp_nonce = _csp_nonce
+    _csp_nonce = getattr(_g_csp, 'csp_nonce', None)
+    if not _csp_nonce:
+        import secrets as _secrets_csp
+        _csp_nonce = _secrets_csp.token_urlsafe(16)
+        _g_csp.csp_nonce = _csp_nonce
 
     csp = (
         "default-src 'self'; "
@@ -348,15 +276,11 @@ def apply_brutal_security_headers(response):
         + "https://hcaptcha.com https://*.hcaptcha.com;"
     )
     response.headers['Content-Security-Policy'] = csp
-    
-    # Brisanje Server zaglavlja kako napadači ne bi znali koju verziju softvera koristimo
     response.headers.pop('Server', None)
-    
     return response
 
 @app.route('/robots.txt', methods=['GET'])
 def robots_txt():
-    """Search engines dobiju eksplicitno Disallow za sve /portal i /api rute."""
     from flask import Response
     return Response(
         "User-agent: *\n"
@@ -366,13 +290,9 @@ def robots_txt():
         mimetype='text/plain'
     )
 
-
 @app.route('/api/csrf/token', methods=['GET'])
 def csrf_token_endpoint():
-    """Vraća aktuelni CSRF token trenutne sesije. Frontend ga poziva pri startu
-    i posle svakog login-a; drži ga u memoriji i šalje u X-CSRF-Token header."""
     return jsonify({"csrf_token": _ensure_csrf_token()})
-
 
 @app.route('/')
 def index():
@@ -380,5 +300,4 @@ def index():
     return render_template('index.html')
 
 if __name__ == '__main__':
-    # Pokretanje servera (OBAVEZNO debug=False za sigurnost)
     app.run(debug=False, host='0.0.0.0', port=5000)
